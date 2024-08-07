@@ -1,6 +1,6 @@
 self.__precacheManifest = (self.__precacheManifest || []).concat([
   {
-    "revision": "f516c63a71600695c56c4777a81d1da9",
+    "revision": "c6729049abe1da603fc07ae780d3c298",
     "url": "/index.html"
   },
   {
@@ -8,8 +8,8 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "/static/css/2.f829102a.chunk.css"
   },
   {
-    "revision": "7cb5a7c2fc922995b044",
-    "url": "/static/css/main.62fb3ba4.chunk.css"
+    "revision": "113e47e5364961bc1c71",
+    "url": "/static/css/main.7c71f637.chunk.css"
   },
   {
     "revision": "244559346c42259e2e4e",
@@ -24,7 +24,7 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "/static/js/3.09a349d4.chunk.js"
   },
   {
-    "revision": "7cb5a7c2fc922995b044",
+    "revision": "113e47e5364961bc1c71",
     "url": "/static/js/main.e535aee1.chunk.js"
   },
   {
@@ -272,8 +272,8 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "/static/media/KaTeX_Typewriter-Regular.b8b8393d.woff2"
   },
   {
-    "revision": "c8afe0da9895622586323f52ab60b61a",
-    "url": "/static/media/dark-background.c8afe0da.jpg"
+    "revision": "1be2b420f7784be47d54b828b4334850",
+    "url": "/static/media/dark-background.1be2b420.jpg"
   },
   {
     "revision": "37d86adbc3cb0516b7c3472f6552d016",
