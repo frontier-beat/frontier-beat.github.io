@@ -14,7 +14,7 @@ def apply_horizontal_gradient_blur(image_path, output_path, max_blur_radius=10):
     center_x = width // 2
 
     # Create a horizontal gradient
-    gradient = np.exp(np.linspace(0, 1, width)) - 1
+    gradient = np.exp(np.exp(np.linspace(0, 1, width))) ** 3
     gradient += gradient[::-1]
     gradient -= gradient.min()
     gradient /= gradient.max()
