@@ -158,7 +158,8 @@ function App() {
     const handleScroll = () => {
       const scrolled = window.pageYOffset;
       if (backgroundRef.current) {
-        backgroundRef.current.style.transform = `translate3d(0, ${scrolled * 0.1}px, 0)`;
+        const yPosition = -(scrolled * 0.005) % 50; // The % 100 creates the repeating effect
+        backgroundRef.current.style.transform = `translate3d(0, ${yPosition}%, 0)`;
       }
     };
 
@@ -168,7 +169,7 @@ function App() {
       window.removeEventListener('scroll', handleScroll);
     };
   }, []);
-
+  
   return (
     <>
       <div className="background" ref={backgroundRef}></div>

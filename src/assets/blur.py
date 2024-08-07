@@ -14,7 +14,7 @@ def apply_horizontal_gradient_blur(image_path, output_path, max_blur_radius=10):
     center_x = width // 2
 
     # Create a horizontal gradient
-    gradient = np.exp(np.exp(np.linspace(0, 1, width))) ** 10
+    gradient = np.exp(np.exp(np.linspace(0, 1, width))) ** 5
     gradient += gradient[::-1]
     gradient -= gradient.min()
     gradient /= gradient.max()
@@ -36,12 +36,7 @@ def apply_horizontal_gradient_blur(image_path, output_path, max_blur_radius=10):
         # Paste only the center column of the blurred slice
         blurred.paste(blurred_slice.crop((max_blur_radius, 0, max_blur_radius + 1, height)), (x, 0))
 
-    # Handle the edge cases (left and right edges)
-    left_edge = img.crop((0, 0, max_blur_radius, height))
-    right_edge = img.crop((width - max_blur_radius, 0, width, height))
-    
-    blurred.paste(left_edge, (0, 0))
-    blurred.paste(right_edge, (width - max_blur_radius, 0))
+    blurred = Image.blend(img, blurred, 0.75)
 
     # Save the result
     blurred.save(output_path)

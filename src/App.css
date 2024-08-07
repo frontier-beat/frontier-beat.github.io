@@ -17,15 +17,26 @@ body {
   top: 0;
   left: 0;
   width: 100%;
-  height: 100%;
+  height: 800%; /* Make the background twice the height of the viewport */
   z-index: -1;
-  background-size: cover;
-  background-position: center;
+  background-size: 100% 100%; /* Make the background image half the height of the div */
+  background-repeat: repeat-y;
   will-change: transform;
   transition: background-image 0.3s ease-in-out;
 }
 
+body.light-mode {
+  background-color: #e0f2ff;
+  color: #292D3E;
+}
+
+body.dark-mode {
+  background-color: #292D3E;
+  color: #A6ACCD;
+}
+
 body.light-mode .background {
+
   background-image: url('assets/light-background.jpg');
 }
 
