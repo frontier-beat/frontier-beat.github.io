@@ -1,50 +1,59 @@
-/* General styles */
+/* ======================================
+   General Styles
+   ====================================== */
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.6;
-  transition: background-color 0.3s, color 0.3s;
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+  transition: background-color 0.3s, color 0.3s;
 }
 
-/* Theme styles */
-.background {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 800%; /* Make the background twice the height of the viewport */
-  z-index: -1;
-  background-size: 100% 100%; /* Make the background image half the height of the div */
-  background-repeat: repeat-y;
-  will-change: transform;
-  transition: background-image 0.3s ease-in-out;
-}
-
+/* ======================================
+   Theme Styles
+   ====================================== */
+/* Light Mode */
 body.light-mode {
   background-color: #e0f2ff;
   color: #292D3E;
 }
 
+body.light-mode .background {
+  background-image: url('assets/light-background.jpg');
+}
+
+/* Dark Mode */
 body.dark-mode {
   background-color: #292D3E;
   color: #A6ACCD;
-}
-
-body.light-mode .background {
-
-  background-image: url('assets/light-background.jpg');
 }
 
 body.dark-mode .background {
   background-image: url('assets/dark-background.jpg');
 }
 
-/* App container */
+/* Background */
+.background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 800%;
+  z-index: -1;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  will-change: transform;
+  transition: background-image 0.3s ease-in-out;
+}
+
+/* ======================================
+   Layout
+   ====================================== */
 .App {
   max-width: 800px;
   margin: 0 auto;
@@ -53,7 +62,23 @@ body.dark-mode .background {
   z-index: 1;
 }
 
-/* Header styles */
+/* ======================================
+   Typography
+   ====================================== */
+h1 {
+  color: #2c3e50;
+  text-align: center;
+  margin-bottom: 30px;
+  font-size: 2.5rem;
+}
+
+.dark-mode h1 {
+  color: #C792EA;
+}
+
+/* ======================================
+   Header Styles
+   ====================================== */
 .App-header {
   background-color: rgba(255, 255, 255, 0.9);
   padding: 20px;
@@ -79,19 +104,9 @@ body.dark-mode .background {
   margin-top: 20px;
 }
 
-/* Typography */
-h1 {
-  color: #2c3e50;
-  text-align: center;
-  margin-bottom: 30px;
-  font-size: 2.5rem;
-}
-
-.dark-mode h1 {
-  color: #C792EA;
-}
-
-/* Repository card styles */
+/* ======================================
+   Repository Card Styles
+   ====================================== */
 .repo-card {
   background-color: rgba(255, 255, 255, 0.7);
   border-radius: 8px;
@@ -99,6 +114,7 @@ h1 {
   padding: 24px;
   margin-bottom: 24px;
   transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  overflow-x: visible;
 }
 
 .dark-mode .repo-card {
@@ -106,12 +122,8 @@ h1 {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
-.repo-card:hover {
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-}
-
-.dark-mode .repo-card:hover {
-  box-shadow: 0 4px 15px rgba(130, 170, 255, 0.3);
+.repo-card-content {
+  display: block;
 }
 
 .repo-card h2 {
@@ -119,33 +131,19 @@ h1 {
   margin-bottom: 16px;
   color: #1976D2;
   font-size: 1.5rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 .dark-mode .repo-card h2 {
   color: #82AAFF;
 }
 
-.repo-card a {
-  color: #82AAFF;
-  text-decoration: none;
-  transition: color 0.2s ease-in-out;
-}
-
-.dark-mode .repo-card a {
-  color: #AAAAFF;
-}
-
-.repo-card a:hover {
-  color: #1565C0;
-  text-decoration: underline;
-}
-
-.dark-mode .repo-card a:hover {
-  color: #C792EA;
-}
-
-.repo-card p {
-  margin-bottom: 12px;
+.repo-card h2 a {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .repo-stats {
@@ -153,6 +151,8 @@ h1 {
   align-items: center;
   font-size: 0.9rem;
   color: #546E7A;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .dark-mode .repo-stats {
@@ -163,7 +163,9 @@ h1 {
   margin-right: 5px;
 }
 
-/* Loading indicator */
+/* ======================================
+   Loading Indicator
+   ====================================== */
 .loading {
   text-align: center;
   padding: 20px;
@@ -175,7 +177,9 @@ h1 {
   color: #676E95;
 }
 
-/* Logo card styles */
+/* ======================================
+   Logo Card Styles
+   ====================================== */
 .logo-card {
   background-color: rgba(255, 255, 255, 0.9);
   border-radius: 8px;
@@ -206,13 +210,15 @@ h1 {
   height: auto;
 }
 
-/* Theme toggle button */
+/* ======================================
+   Theme Toggle Button
+   ====================================== */
 .theme-toggle {
   position: fixed;
   top: 20px;
   right: 20px;
-  width: 24px;  /* Set a fixed width */
-  height: 24px; /* Set a fixed height */
+  width: 32px;
+  height: 32px;
   font-size: 24px;
   cursor: pointer;
   z-index: 1000;
@@ -224,8 +230,8 @@ h1 {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding-top: 11x; /* Slightly more padding on top */
-  padding-bottom: 9px; /* Slightly less padding on bottom */
+  padding-top: 11px;
+  padding-bottom: 9px;
 }
 
 .dark-mode .theme-toggle {
@@ -243,6 +249,9 @@ h1 {
   box-shadow: 0 4px 15px rgba(130, 170, 255, 0.3);
 }
 
+/* ======================================
+   Code and Math Styles
+   ====================================== */
 .paper-summary code {
   background-color: #f0f0f0;
   border-radius: 4px;
@@ -253,7 +262,32 @@ h1 {
   color: #f0f0f0;
 }
 
-/* Responsive design */
+/* Math equation styles */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  padding: 10px 0;
+}
+
+.katex-display > .katex {
+  white-space: nowrap;
+  max-width: none;
+}
+
+.katex-inline {
+  display: inline-block;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  vertical-align: middle;
+  padding: 0 2px;
+}
+
+/* ======================================
+   Responsive Design
+   ====================================== */
 @media (max-width: 600px) {
   .App {
     padding: 10px;
@@ -275,4 +309,3 @@ h1 {
     line-height: 1;
   }
 }
-

@@ -18,16 +18,16 @@ const renderMath = (text) => {
   const parts = text.split(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/);
   
   return parts.map((part, index) => {
-    if (part.startsWith('$$') && part.endsWith('$$')) {
-      return <BlockMath key={index}>{part.slice(2, -2)}</BlockMath>;
-    } else if (part.startsWith('$') && part.endsWith('$')) {
-      return <InlineMath key={index}>{part.slice(1, -1)}</InlineMath>;
-    } else {
-      // Handle escaped backslashes and underscores
-      const processedText = part
-        .replace(/\\\\/g, '\\')
-        .replace(/\\_/g, '_');
-      return processedText;
+      if (part.startsWith('$$') && part.endsWith('$$')) {
+        return <div key={index} className="katex-display"><BlockMath>{part.slice(2, -2)}</BlockMath></div>;
+      } else if (part.startsWith('$') && part.endsWith('$')) {
+        return <span key={index} className="katex-inline"><InlineMath>{part.slice(1, -1)}</InlineMath></span>;
+      } else {
+          // Handle escaped backslashes and underscores
+          const processedText = part
+            .replace(/\\\\/g, '\\')
+            .replace(/\\_/g, '_');
+          return processedText;
     }
   });
 };
@@ -72,7 +72,7 @@ const RepoCard = ({ repo }) => {
     return parts.map((part, index) => {
       if (index % 2 === 1) {
         // This is a block-level equation
-        return <BlockMath key={index}>{part}</BlockMath>;
+        return <div key={index} className="katex-display"><BlockMath>{part}</BlockMath></div>;
       } else {
         // This is regular text or inline math
         return <ReactMarkdown key={index} components={components}>{part}</ReactMarkdown>;
@@ -82,24 +82,26 @@ const RepoCard = ({ repo }) => {
 
   return (
     <div className="repo-card">
-      <h2>
-        <a href={repo.html_link} target="_blank" rel="noopener noreferrer">
-          {renderMath(repo.title)}
-        </a>
-      </h2>
-      <div className="paper-summary">
-        {processContent(repo.paper_summary)}
-      </div>
-      <div className="repo-stats">
-        <FaCode />
-        <a href={repo.html_url} target="_blank" rel="noopener noreferrer">
-          {repo.full_name}
-        </a>
-      </div>
-      <div className="repo-stats">
-        <FaStar />
-        {repo.star_count}
-        {showRate && ` (+${formattedRate}/hour)`}
+      <div className="repo-card-content">
+        <h2>
+          <a href={repo.html_link} target="_blank" rel="noopener noreferrer">
+            {renderTitle(repo.title)}
+          </a>
+        </h2>
+        <div className="paper-summary">
+          {processContent(repo.paper_summary)}
+        </div>
+        <div className="repo-stats">
+          <FaCode />
+          <a href={repo.html_url} target="_blank" rel="noopener noreferrer">
+            {repo.full_name}
+          </a>
+        </div>
+        <div className="repo-stats">
+          <FaStar />
+          {repo.star_count}
+          {showRate && ` (+${formattedRate}/hour)`}
+        </div>
       </div>
     </div>
   );
@@ -116,15 +118,29 @@ function App() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(() => {
-  const savedTheme = localStorage.getItem('theme');
-    return savedTheme === 'dark';
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      return savedTheme === 'dark';
+    }
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
   const initialFetchDone = useRef(false);
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => {
+      setIsDarkMode(e.matches);
+    };
+
+    mediaQuery.addListener(handleChange);
+
+    return () => mediaQuery.removeListener(handleChange);
+  }, []);
+
+  useEffect(() => {
     applyTheme(isDarkMode);
     if (!initialFetchDone.current) {
-      fetchRepos(1); // Fetch first page when component mounts
+      fetchRepos(1);
       initialFetchDone.current = true;
     }
   }, []);
@@ -137,7 +153,7 @@ function App() {
   const toggleTheme = () => {
     setIsDarkMode(prevMode => !prevMode);
   };
-
+  
   const fetchRepos = async (pageNum) => {
     try {
       const response = await axios.get(`https://api.frontier-beat.site/top_papers?page=${pageNum}&per_page=10`);
