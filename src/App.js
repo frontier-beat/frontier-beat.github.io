@@ -3,7 +3,7 @@ import axios from 'axios';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import ReactMarkdown from 'react-markdown';
 import { InlineMath, BlockMath } from 'react-katex';
-import { FaStar, FaCode, FaMoon, FaSun } from 'react-icons/fa';
+import { FaStar, FaCode, FaMoon, FaSun, FaCoffee } from 'react-icons/fa';
 import 'katex/dist/katex.min.css';
 import './App.css';
 import lightLogo from './assets/light-logo.png';
@@ -49,7 +49,10 @@ const RepoCard = ({ repo }) => {
     p: ({ children }) => <p>{React.Children.map(children, child => 
       typeof child === 'string' ? renderMath(child) : child
     )}</p>,
-    // ... other heading components
+    li: ({ children }) => <li>{React.Children.map(children, child => 
+      typeof child === 'string' ? renderMath(child) : child
+    )}</li>,
+    ul: ({ children }) => <ul>{children}</ul>,
     code: ({ node, inline, className, children, ...props }) => {
       const match = /language-(\w+)/.exec(className || '')
       return !inline && match ? (
@@ -107,9 +110,30 @@ const RepoCard = ({ repo }) => {
   );
 };
 
+const Footer = () => (
+  <div className="footer">
+    <FaCoffee /> Freshly brewed by <a
+      href="https://eric-bolton.github.io/"
+      target="_blank"
+      rel="noopener noreferrer"
+    >Eric Bolton</a>. <a 
+      href="https://buymeacoffee.com/ericbolton" 
+      target="_blank" 
+      rel="noopener noreferrer"
+    >A brew for a brew?</a> © {new Date().getFullYear()} Frontier Beat. All rights reserved.
+    <br />
+  </div>
+  );
+
 const LogoCard = ({ isDarkMode }) => (
   <div className="logo-card" onClick={() => window.location.reload()}>
     <img src={isDarkMode ? darkLogo : lightLogo} alt="Frontier Beat Logo" className="App-logo" />
+  </div>
+);
+
+const WelcomeMessage = () => (
+  <div className="welcome-message">
+    <h2>Today's Trending Open-Source Machine Learning Papers</h2>
   </div>
 );
 
@@ -197,21 +221,27 @@ function App() {
           dataLength={repos.length}
           next={() => fetchRepos(page)}
           hasMore={hasMore}
-          loader={<div className="loading">Loading...</div>}
+          loader={<div className="loading">Loading trending papers...</div>}
           endMessage={
             <p style={{ textAlign: 'center' }}>
-              <b>You have seen all the top repositories!</b>
+              <b>You've reached the end of our trending ML papers list!</b>
             </p>
           }
         >
           {repos.map((repo, index) => (
             <React.Fragment key={repo.id}>
-              {index === 0 && <LogoCard isDarkMode={isDarkMode} />}
+              {index === 0 && (
+                <>
+                  <LogoCard isDarkMode={isDarkMode} />
+                  <WelcomeMessage />
+                </>
+              )}
               <RepoCard repo={repo} />
             </React.Fragment>
           ))}
         </InfiniteScroll>
       </div>
+      <Footer />
     </>
   );
 }
