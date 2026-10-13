@@ -2,6 +2,8 @@ import { Summary, Title } from './Markdown';
 import { WINDOWS } from '../api';
 
 const fmt = new Intl.NumberFormat('en-US');
+const fmtRate = (r) => (r >= 100 ? fmt.format(Math.round(r)) : r.toFixed(1));
+const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const day = (iso) => (iso ? String(iso).slice(0, 10) : null);
 
 // Departure-board strip: rank, category, date on the left; the numbers on
@@ -9,9 +11,9 @@ const day = (iso) => (iso ? String(iso).slice(0, 10) : null);
 function Strip({ paper, rank, sort, window }) {
   const windowLabel = WINDOWS.find((w) => w.value === window)?.label;
   const stats = [
-    paper.star_count != null && { key: 'stars', text: `${fmt.format(paper.star_count)} stars` },
-    paper.hourly_rate > 0 && { key: 'trending', text: `+${paper.hourly_rate.toFixed(1)}/h` },
-    paper.stars_gained != null && { key: 'gained', text: `+${fmt.format(paper.stars_gained)} ${windowLabel ?? ''}`.trim() },
+    isNum(paper.star_count) && { key: 'stars', text: `${fmt.format(paper.star_count)} stars` },
+    isNum(paper.hourly_rate) && paper.hourly_rate > 0 && { key: 'trending', text: `+${fmtRate(paper.hourly_rate)}/h` },
+    isNum(paper.stars_gained) && { key: 'gained', text: `+${fmt.format(paper.stars_gained)} ${windowLabel ?? ''}`.trim() },
   ].filter(Boolean);
   return (
     <div className="strip">

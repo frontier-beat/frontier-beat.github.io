@@ -1,5 +1,6 @@
 // Client for GET /top_papers (contracts.md "API contract").
-export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://api.frontier-beat.site').replace(/\/+$/, '');
+// Production default is the Cloud Run service; tests and dev override it.
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://api-rcvqmjv3ua-ue.a.run.app').replace(/\/+$/, '');
 
 export const SORTS = [
   { value: 'trending', label: 'Trending' },
@@ -19,8 +20,10 @@ export const DEFAULT_SORT = 'trending';
 export const DEFAULT_WINDOW = 'month';
 export const PER_PAGE = 10;
 
-// `stars` is a current total, so a time window does not change it.
+// `stars` is a current total, so a time window does not change it. The UI
+// keeps the chosen window for the other sorts but asks the API for `all`.
 export const sortUsesWindow = (sort) => sort !== 'stars';
+export const effectiveWindow = (sort, window) => (sortUsesWindow(sort) ? window : 'all');
 
 export async function fetchPapers({ sort, window, page, signal }) {
   const params = new URLSearchParams({ sort, window, page: String(page), per_page: String(PER_PAGE) });

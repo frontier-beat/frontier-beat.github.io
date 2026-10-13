@@ -120,6 +120,9 @@ a:hover {
 
 .segments {
   display: flex;
+  gap: 1px; /* hairlines between options come from the background */
+  border: 1px solid var(--line);
+  background: var(--line);
 }
 
 .segments input {
@@ -131,22 +134,23 @@ a:hover {
 
 .segments span,
 .button {
-  display: inline-block;
+  display: block;
   padding: 6px 10px;
   border: 1px solid var(--line);
-  background: none;
+  background: var(--bg);
   color: inherit;
   font-family: inherit;
+  text-align: center;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.segments label + label span {
-  border-left: 0;
+.segments span {
+  border: 0;
 }
 
 .segments input:checked + span {
   background: var(--fg);
-  border-color: var(--fg);
   color: var(--bg);
 }
 
@@ -161,6 +165,10 @@ a:hover {
 
 .segmented:disabled span {
   cursor: not-allowed;
+}
+
+.button {
+  display: inline-block;
 }
 
 .button.icon {
@@ -292,6 +300,26 @@ a:hover {
 
   .logo {
     height: 28px;
+  }
+
+  /* Controls: legend above, options fill the column. */
+  .segmented {
+    display: block;
+    width: 100%;
+  }
+
+  .segmented legend {
+    float: none;
+    margin-bottom: 6px;
+  }
+
+  .segments {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .segmented:first-child .segments {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   /* Phone: only the stat that matches the current sort. */

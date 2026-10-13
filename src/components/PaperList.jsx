@@ -4,7 +4,7 @@ import { PER_PAGE, fetchPapers } from '../api';
 
 // Mounted with key={sort + window}, so a new ranking starts from a fresh
 // list and the previous list's in-flight request is aborted on unmount.
-export default function PaperList({ sort, window }) {
+export default function PaperList({ sort, window, onShowAll }) {
   const [papers, setPapers] = useState([]);
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
@@ -56,7 +56,15 @@ export default function PaperList({ sort, window }) {
             <button type="button" className="button" onClick={() => setAttempt((a) => a + 1)}>Retry</button>
           </>
         )}
-        {status === 'done' && (papers.length ? `End of list · ${papers.length} papers` : 'No papers in this window. Try a longer one.')}
+        {status === 'done' && papers.length > 0 && `End of list · ${papers.length} papers`}
+        {status === 'done' && papers.length === 0 && (
+          onShowAll ? (
+            <>
+              No papers in this window.{' '}
+              <button type="button" className="button" onClick={onShowAll}>Show all time</button>
+            </>
+          ) : 'No papers yet.'
+        )}
       </div>
     </section>
   );

@@ -6,7 +6,7 @@ import lightLogo from './assets/light-logo.png';
 import darkLogo from './assets/dark-logo.png';
 import PaperList from './components/PaperList';
 import RankingControls from './components/RankingControls';
-import { DEFAULT_SORT, DEFAULT_WINDOW, SORTS, WINDOWS } from './api';
+import { DEFAULT_SORT, DEFAULT_WINDOW, SORTS, WINDOWS, effectiveWindow } from './api';
 
 const FixturePage = lazy(() => import('./components/FixturePage'));
 
@@ -56,6 +56,7 @@ export default function App() {
   const [dark, toggleTheme] = useTheme();
   const [ranking, setRanking] = useState(readRanking);
   const fixtures = new URLSearchParams(window.location.search).has('fixtures');
+  const apiWindow = effectiveWindow(ranking.sort, ranking.window);
 
   useEffect(() => {
     const onPop = () => setRanking(readRanking());
@@ -83,7 +84,12 @@ export default function App() {
         ) : (
           <>
             <RankingControls sort={ranking.sort} window={ranking.window} onChange={changeRanking} />
-            <PaperList key={`${ranking.sort}:${ranking.window}`} sort={ranking.sort} window={ranking.window} />
+            <PaperList
+              key={`${ranking.sort}:${apiWindow}`}
+              sort={ranking.sort}
+              window={apiWindow}
+              onShowAll={apiWindow === 'all' ? undefined : () => changeRanking({ sort: ranking.sort, window: 'all' })}
+            />
           </>
         )}
       </div>
