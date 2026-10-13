@@ -25,14 +25,13 @@ for (const theme of ['light', 'dark']) {
           left: logo.left - col.left, right: col.right - logo.right,
           above: logo.top, below: title.top - logo.bottom, height: logo.height,
           toggleOverlap: !(toggle.bottom + 8 <= logo.top || toggle.top >= logo.bottom + 8 || toggle.right <= logo.left || toggle.left >= logo.right),
-          bgImage: getComputedStyle(document.querySelector('.background')).backgroundImage,
         };
       });
       console.log(`[${theme} ${name}]`, JSON.stringify(m));
       expect(Math.abs(m.left - m.right)).toBeLessThanOrEqual(1);
       expect(Math.abs(m.above - m.below)).toBeLessThanOrEqual(1);
       expect(m.toggleOverlap).toBe(false);
-      expect(m.bgImage).toContain(theme === 'dark' ? 'bg-dark' : 'bg-light');
+      await expect.poll(() => page.locator('.background').evaluate((el) => getComputedStyle(el).backgroundImage)).toContain(theme === 'dark' ? 'bg-dark' : 'bg-light');
 
       const bgY = () => page.locator('.background').evaluate((el) => getComputedStyle(el).backgroundPositionY);
       const before = await bgY();

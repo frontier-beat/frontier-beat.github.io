@@ -4,6 +4,8 @@ import 'katex/dist/katex.min.css';
 import './App.css';
 import lightLogo from './assets/logo-light.png';
 import darkLogo from './assets/logo-dark.png';
+import skyLight from './assets/bg-light.jpg';
+import skyDark from './assets/bg-dark.jpg';
 import PaperList from './components/PaperList';
 import RankingControls from './components/RankingControls';
 import { DEFAULT_SORT, DEFAULT_WINDOW, SORTS, WINDOWS, effectiveWindow } from './api';
@@ -43,15 +45,35 @@ function useTheme() {
   return [dark, toggle];
 }
 
-// Space/sky backdrop. The image tiles vertically; scrolling drifts it at
-// the 2024 site's speed (0.005% of an 8-screen layer per pixel scrolled).
-function Background() {
+// Space/sky backdrop: one seamless period of the 2024 images, tiled down
+// the screen (seamless_tile.py). Scrolling drifts it at the 2024 site's
+// speed (0.005% of an 8-screen layer per pixel scrolled). The image is
+// applied only once decoded, so the page never shows a half-painted backdrop.
+const TILE_ASPECT = 3856 / 1922; // bg-*.jpg height / width
+
+function Background({ dark }) {
   const ref = useRef(null);
+  const [src, setSrc] = useState(null);
+
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+    const url = dark ? skyDark : skyLight;
+    let live = true;
+    const img = new Image();
+    img.src = url;
+    img.decode().catch(() => {}).then(() => { if (live) setSrc(url); });
+    return () => { live = false; };
+  }, [dark]);
+
+  useEffect(() => {
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let frame = 0;
     const place = () => {
-      if (ref.current) ref.current.style.backgroundPositionY = `${-window.scrollY * window.innerHeight * 0.0004}px`;
+      const el = ref.current;
+      if (!el) return;
+      // The tile starts a quarter of the way into the 2024 image; shifting
+      // by half a tile shows the image's top at scroll 0, as the old site did.
+      const halfTile = (el.clientWidth * TILE_ASPECT) / 2;
+      el.style.backgroundPositionY = `${halfTile - (still ? 0 : window.scrollY * window.innerHeight * 0.0004)}px`;
     };
     const onScroll = () => {
       cancelAnimationFrame(frame);
@@ -59,12 +81,15 @@ function Background() {
     };
     place(); // pages can open already scrolled (reload, back/forward)
     window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
     };
   }, []);
-  return <div className="background" ref={ref} aria-hidden="true" />;
+
+  return <div className="background" ref={ref} aria-hidden="true" style={src ? { backgroundImage: `url(${src})` } : undefined} />;
 }
 
 const Footer = () => (
@@ -95,7 +120,7 @@ export default function App() {
 
   return (
     <>
-      <Background />
+      <Background dark={dark} />
       <button type="button" className="button icon theme-toggle" onClick={toggleTheme} aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}>
         {dark ? <FaSun /> : <FaMoon />}
       </button>
