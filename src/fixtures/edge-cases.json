@@ -1,0 +1,233 @@
+[
+  {
+    "id": "currency-prose",
+    "title": "Plain currency",
+    "paper_summary": "The model costs about USD 10M to train, and inference is cheap.",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "currency-dollars",
+    "title": "Currency written with dollars",
+    "paper_summary": "Training cost $5 and $10 per hour, versus $0.34 per query.",
+    "summary_version": 2,
+    "valid_v2": false
+  },
+  {
+    "id": "dollar-in-code",
+    "title": "Dollar inside code spans",
+    "paper_summary": "Set `$HOME` or write `$x$` literally; real math: $x^2$.",
+    "summary_version": 2,
+    "valid_v2": false
+  },
+  {
+    "id": "unbalanced-dollar",
+    "title": "Unbalanced dollar",
+    "paper_summary": "The bound $O(n \\log n) holds when $n$ is large.",
+    "summary_version": 2,
+    "valid_v2": false
+  },
+  {
+    "id": "inline-display-mid-sentence",
+    "title": "Inline $$ mid-sentence",
+    "paper_summary": "The loss $$\\mathcal{L} = \\sum_i \\ell_i$$ is minimised jointly.",
+    "summary_version": 2,
+    "valid_v2": false
+  },
+  {
+    "id": "aligned-row-breaks",
+    "title": "Aligned rows",
+    "paper_summary": "We optimise two objectives.\n\n$$\n\\begin{aligned}\n\\mathcal{L}_{\\text{total}} &= \\mathcal{L}_{\\text{rec}} + \\lambda \\mathcal{L}_{\\text{kl}} \\\\\n\\mathcal{L}_{\\text{kl}} &= D_{\\mathrm{KL}}(q(z \\mid x) \\,\\|\\, p(z))\n\\end{aligned}\n$$\n\nBoth terms are weighted.",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "text-underscores",
+    "title": "Underscores inside text commands",
+    "paper_summary": "The schedule sets $\\text{lr_max} = 3 \\times 10^{-4}$ and $\\eta_{\\text{warm_up}} = 0.1$.",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "percent-ampersand",
+    "title": "Percent and ampersand",
+    "paper_summary": "Accuracy rises by $12\\%$ (and by $50%$ on hard cases); $A \\& B$ and $P & Q$ are datasets. Plain prose: 30% & more.",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "nested-braces",
+    "title": "Nested braces",
+    "paper_summary": "The estimator is $\\hat{\\mu} = \\frac{\\sum_{i=1}^{n} w_i^{2} x_{i}}{\\sqrt{\\sum_{j=1}^{n} w_j^{2}}}$.",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "set-braces",
+    "title": "Escaped braces",
+    "paper_summary": "The vocabulary is $V = \\{v_1, \\dots, v_n\\}$ and $\\left\\{ x \\mid x > 0 \\right\\}$.",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "unicode-symbols",
+    "title": "Unicode symbols",
+    "paper_summary": "For $α + β ≤ γ$ we get a 3× speed-up and ≥ 95% recall → better results, naïve baselines.",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "long-display",
+    "title": "Long display equation",
+    "paper_summary": "The full objective:\n\n$$\n\\mathcal{L}(\\theta) = \\mathbb{E}_{x \\sim p_{\\text{data}}}\\left[\\log D_\\phi(x)\\right] + \\mathbb{E}_{z \\sim p(z)}\\left[\\log\\left(1 - D_\\phi(G_\\theta(z))\\right)\\right] + \\lambda_1 \\|\\theta\\|_2^2 + \\lambda_2 \\sum_{k=1}^{K} \\mathrm{KL}\\left(q_k \\,\\|\\, p_k\\right) + \\gamma \\cdot \\mathrm{TV}(G_\\theta)\n$$\n\nThis is long on purpose.",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "long-inline",
+    "title": "Long inline equation",
+    "paper_summary": "Inline: $\\mathcal{L}(\\theta)=\\mathbb{E}_{x\\sim p_{\\text{data}}}[\\log D_\\phi(x)]+\\mathbb{E}_{z\\sim p(z)}[\\log(1-D_\\phi(G_\\theta(z)))]+\\lambda_1\\|\\theta\\|_2^2+\\lambda_2\\sum_{k=1}^{K}\\mathrm{KL}(q_k\\|p_k)$ ends here.",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "math-in-title",
+    "title": "$\\tau$-bench and MC$^2$: Tool-Agent Benchmarks with $\\mathcal{O}(n)$ Cost",
+    "paper_summary": "Titles go through the same inline path as summaries.",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "emphasis-adjacent",
+    "title": "Emphasis next to math",
+    "paper_summary": "We call *$x$* the key, **$\\mathcal{L}$** the loss, and *the map $f_\\theta$* the encoder; $a*b$ is a product.",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "prose-underscores",
+    "title": "Underscores in prose",
+    "paper_summary": "Set use_cache and max_new_tokens; the __init__ hook and snake_case names stay intact, as do $a_1$ and $b_1$.",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "escaped-dollar",
+    "title": "Backslash-escaped dollar",
+    "paper_summary": "A literal \\$5 fee and \\$ signs stay visible, with $x$ as math.",
+    "summary_version": 2,
+    "valid_v2": false
+  },
+  {
+    "id": "html-entities",
+    "title": "HTML entities and tags",
+    "paper_summary": "Tom &amp; Jerry &lt;3; math with entities $a &lt; b$ and <b>bold</b> tags.",
+    "summary_version": 2,
+    "valid_v2": false
+  },
+  {
+    "id": "equation-first-line",
+    "title": "Equation first",
+    "paper_summary": "$$\nE = mc^2\n$$\n\nThe equation comes before any prose.",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "list-with-display",
+    "title": "List containing display math",
+    "paper_summary": "- First point with $x$.\n- Second point uses this objective:\n\n  $$\n  \\min_\\theta \\sum_i \\ell(f_\\theta(x_i), y_i)\n  $$\n\n- Third point.",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "list-unindented-display",
+    "title": "Display after a bullet, unindented",
+    "paper_summary": "- First point.\n- Second point:\n\n$$\ny = Wx + b\n$$\n\n- Third point.",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "cases-env",
+    "title": "Cases environment",
+    "paper_summary": "The gate is\n\n$$\ng(x) = \\begin{cases} 1 & \\text{if } x > \\tau \\\\ 0 & \\text{otherwise} \\end{cases}\n$$",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "pipes-and-angles",
+    "title": "Pipes and angle brackets",
+    "paper_summary": "We model $p(x|z)$ and $|x| < \\epsilon$ with $\\langle q, k \\rangle$ and $a<b>c$.",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "digit-start-math",
+    "title": "Math starting with a digit",
+    "paper_summary": "There are $2^n$ states and $10^{-3}$ error, with $1-\\epsilon$ confidence.",
+    "summary_version": 2,
+    "valid_v2": true
+  },
+  {
+    "id": "unsupported-label",
+    "title": "Unsupported label and equation env",
+    "paper_summary": "$$\n\\begin{equation} y = f(x) \\label{eq:main} \\end{equation}\n$$\n\nSee \\eqref{eq:main}.",
+    "summary_version": 2,
+    "valid_v2": false
+  },
+  {
+    "id": "text-nested-math",
+    "title": "Text command with nested math",
+    "paper_summary": "We define $y = \\text{for all $x$ in } S$.",
+    "summary_version": 2,
+    "valid_v2": false
+  },
+  {
+    "id": "inline-wraps-line",
+    "title": "Inline math across a line break",
+    "paper_summary": "The value $a +\nb$ wraps.",
+    "summary_version": 2,
+    "valid_v2": false
+  },
+  {
+    "id": "bare-latex-line",
+    "title": "LaTeX without delimiters",
+    "paper_summary": "Equations defining rewards: \\text{State: } s_t = R_t, \\quad \\text{Reward: } r_t = f(s_t, a_t)",
+    "summary_version": 1,
+    "valid_v2": false
+  },
+  {
+    "id": "v1-double-backslash",
+    "title": "v1 doubled backslashes",
+    "paper_summary": "Complexity drops from $O(kh)$ to $O(h \\\\log_2(k))$ with $15,000 \\\\times$ speed-up.",
+    "summary_version": 1,
+    "valid_v2": false
+  },
+  {
+    "id": "v1-escaped-underscore",
+    "title": "v1 escaped underscore",
+    "paper_summary": "The loss $L\\_{total} = L\\_{rec} + L\\_{kl}$ is used.",
+    "summary_version": 1,
+    "valid_v2": false
+  },
+  {
+    "id": "v1-inline-display",
+    "title": "v1 $$ inline",
+    "paper_summary": "- Point.\nEquation: $$\\text{Loss} = \\alpha \\cdot L_{s} + (1 - \\alpha) \\cdot L_{t}$$  ",
+    "summary_version": 1,
+    "valid_v2": false
+  },
+  {
+    "id": "v1-tab-damage",
+    "title": "v1 JSON tab damage",
+    "paper_summary": "$$\n\\\text{IR} = \\frac{\\# \\\text{ unstable}}{\\# \\\text{ total}} \\times 100\\\n$$\nwith \\\theta fixed.",
+    "summary_version": 1,
+    "valid_v2": false
+  },
+  {
+    "id": "long-word",
+    "title": "Very long unbroken word",
+    "paper_summary": "See huggingface.co/organisation-name/an-extremely-long-model-repository-name-without-any-breaks-at-all for weights.",
+    "summary_version": 2,
+    "valid_v2": true
+  }
+]
