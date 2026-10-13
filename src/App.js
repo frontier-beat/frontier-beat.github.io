@@ -3,7 +3,7 @@ import axios from 'axios';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import ReactMarkdown from 'react-markdown';
 import { InlineMath, BlockMath } from 'react-katex';
-import { FaStar, FaCode, FaMoon, FaSun, FaCoffee } from 'react-icons/fa';
+import { FaStar, FaCode, FaMoon, FaSun, FaCoffee, FaHeart } from 'react-icons/fa';
 import 'katex/dist/katex.min.css';
 import './App.css';
 import lightLogo from './assets/light-logo.png';
@@ -15,19 +15,17 @@ const renderMath = (text) => {
   }
   
   // Split the text into LaTeX and non-LaTeX parts
-  const parts = text.split(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/);
+  const parts = text.split(/(\$[^$\n]+?\$)/);
   
   return parts.map((part, index) => {
-      if (part.startsWith('$$') && part.endsWith('$$')) {
-        return <div key={index} className="katex-display"><BlockMath>{part.slice(2, -2)}</BlockMath></div>;
-      } else if (part.startsWith('$') && part.endsWith('$')) {
-        return <span key={index} className="katex-inline"><InlineMath>{part.slice(1, -1)}</InlineMath></span>;
-      } else {
-          // Handle escaped backslashes and underscores
-          const processedText = part
-            .replace(/\\\\/g, '\\')
-            .replace(/\\_/g, '_');
-          return processedText;
+    if (part.startsWith('$') && part.endsWith('$')) {
+      // Unescape underscores before passing to InlineMath
+      const unescapedLatex = part.slice(1, -1).replace(/\\_/g, '_');
+      return <span key={index} className="katex-inline"><InlineMath>{unescapedLatex}</InlineMath></span>;
+    } else {
+      // Handle escaped backslashes
+      const processedText = part.replace(/\\\\/g, '\\');
+      return processedText;
     }
   });
 };
@@ -67,17 +65,24 @@ const RepoCard = ({ repo }) => {
     },
   };
 
+  const escapeLatex = (text) => {
+    return text.replace(/\$(.*?)\$/g, (match, p1) => {
+      return '$' + p1.replace(/_/g, '\\_') + '$';
+    });
+  };
+
   const processContent = (content) => {
-    // Handle block-level equations
-    const blockEquationRegex = /\$\$([\s\S]*?)\$\$/g;
-    const parts = content.split(blockEquationRegex);
+    // Escape underscores in LaTeX expressions
+    const escapedContent = escapeLatex(content);
+    
+    // Split on block-level equations
+    const parts = escapedContent.split(/(\$\$[\s\S]*?\$\$)/);
     
     return parts.map((part, index) => {
-      if (index % 2 === 1) {
-        // This is a block-level equation
-        return <div key={index} className="katex-display"><BlockMath>{part}</BlockMath></div>;
+      if (part.startsWith('$$') && part.endsWith('$$')) {
+        return <div key={index} className="katex-display"><BlockMath>{part.slice(2, -2).replace(/\\_/g, '_')}</BlockMath></div>;
       } else {
-        // This is regular text or inline math
+        // Use ReactMarkdown for everything else, including inline LaTeX
         return <ReactMarkdown key={index} components={components}>{part}</ReactMarkdown>;
       }
     });
@@ -112,16 +117,15 @@ const RepoCard = ({ repo }) => {
 
 const Footer = () => (
   <div className="footer">
-    <FaCoffee /> Freshly brewed by <a
+    <FaCoffee size={10}/> Freshly brewed with <FaHeart size={8}/> at the <a 
+      href="https://www.recurse.com/" 
+      target="_blank" 
+      rel="noopener noreferrer"
+    >Recurse Center</a> in New York © {new Date().getFullYear()} <a
       href="https://eric-bolton.github.io/"
       target="_blank"
       rel="noopener noreferrer"
-    >Eric Bolton</a>. <a 
-      href="https://buymeacoffee.com/ericbolton" 
-      target="_blank" 
-      rel="noopener noreferrer"
-    >A brew for a brew?</a> © {new Date().getFullYear()} Frontier Beat. All rights reserved.
-    <br />
+    >Eric Bolton</a>. All rights reserved.
   </div>
   );
 

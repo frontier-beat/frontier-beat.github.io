@@ -1,0 +1,8 @@
+node_modules
+build/
+dist/
+.DS_Store
+src/assets/env/
+test-results/
+playwright-report/
+.env.local

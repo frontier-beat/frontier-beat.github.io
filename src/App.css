@@ -185,7 +185,7 @@ h1 {
 .repo-card h2 {
   margin-top: 0;
   margin-bottom: 16px;
-  color: #1976D2;
+  color: #000000;
   font-size: 1.5rem;
   font-weight: 500;
   word-wrap: break-word;
@@ -193,11 +193,16 @@ h1 {
   hyphens: auto;
 }
 
-.dark-mode .repo-card h2 {
-  color: #82AAFF;
+.repo-card h2 {
+  color: #292D3E;
+}
+
+.dark-mode .repo-card h2 a {
+  color: #A6ACCD;
 }
 
 .repo-card h2 a {
+  color: #292D3E;
   text-decoration: none;
   transition: color 0.3s ease, text-decoration 0.3s ease;
 }
