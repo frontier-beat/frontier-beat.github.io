@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Summary, Title } from '../components/Markdown';
 import edgeCases from '../fixtures/edge-cases.json';
+import { existsSync, readFileSync } from 'node:fs';
 import legacy from '../fixtures/summaries-2024.json';
+import { normalizeSummary } from './normalize';
 
 // Drop KaTeX output (balanced <span class="katex...">) so only prose remains.
 function proseOnly(html) {
@@ -62,5 +64,19 @@ describe('renderer over fixtures', () => {
     console.log(`v1: ${results.length} rows, ${withErrors.length} with .katex-error, ${withStray.length} with visible TeX`);
     console.log('errors:', withErrors.map((r) => `${r.id}(${r.errors})`).join(' '));
     console.log('stray:', withStray.slice(0, 40).map((r) => `${r.id}[${r.strayTex.slice(0, 3).join(' ')}]`).join(' '));
+  });
+});
+
+// Optional: live v2 rows fetched by scripts/fetch-v2.mjs.
+const v2File = process.env.V2_FIXTURES;
+describe.runIf(v2File && existsSync(v2File))('live v2 summaries', () => {
+  it('render with no KaTeX errors or raw TeX, and take the plain path', () => {
+    const rows = JSON.parse(readFileSync(v2File, 'utf8'));
+    const results = rows.map((r) => ({ ...check(r), changed: normalizeSummary(r.paper_summary, 2) !== r.paper_summary.replace(/\r\n/g, '\n') }));
+    const math = rows.filter((r) => r.paper_summary.includes('$')).length;
+    console.log(`live v2: ${rows.length} rows (${math} with math), ${results.filter((r) => r.errors).length} with KaTeX errors, ` +
+      `${results.filter((r) => r.strayTex.length).length} with raw TeX, ${results.filter((r) => r.changed).length} changed by the normaliser`);
+    for (const r of results.filter((x) => x.errors || x.strayTex.length || x.changed)) console.log('  ', r.id, r.errors, r.strayTex, r.changed);
+    expect(results.filter((r) => r.errors || r.strayTex.length || r.changed)).toEqual([]);
   });
 });
