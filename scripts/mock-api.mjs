@@ -42,7 +42,7 @@ const papers = rows.map((r) => {
   const rnd = rand(r.arxiv_id);
   const stars = Math.floor(20 + rnd() ** 3 * 40000);
   const rate = Number((rnd() ** 2 * 12).toFixed(2));
-  const slug = r.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'repo';
+  const slug = r.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').split('-').slice(0, 4).join('-') || 'repo';
   return {
     arxiv_id: r.arxiv_id,
     title: r.title,

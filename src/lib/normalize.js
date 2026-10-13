@@ -8,13 +8,24 @@
 // "\right" becomes CR + "ight", "\nabla" becomes LF + "abla".
 const NEWLINE_COMMANDS = 'abla|eq|eg|u|i|ot|otin|onumber|ewline|leq|geq|mid|parallel|subseteq|exists';
 
+// A bare control character (no backslash left) is repaired only before the
+// rest of a command it is known to have eaten; a real tab stays whitespace.
+const EATEN = {
+  '\t': 'ext|heta|imes|au|ilde|anh|riangle|op(?![a-z])|o(?![a-z])',
+  '\r': 'ight|ho|angle|m(?=\{)',
+  '\f': 'rac|orall',
+  '\x08': 'eta|ar|oldsymbol|egin|ig',
+};
+const LETTER = { '\t': 't', '\r': 'r', '\f': 'f', '\x08': 'b' };
+
 function repairControlChars(s) {
-  return s
-    .replace(/\r\n/g, '\n')
-    .replace(/\\?\t(?=[A-Za-z])/g, '\\t')
-    .replace(/\\?\r(?=[A-Za-z])/g, '\\r')
-    .replace(/\\?\f(?=[A-Za-z])/g, '\\f')
-    .replace(/\\?\x08(?=[A-Za-z])/g, '\\b')
+  let out = s.replace(/\r\n/g, '\n');
+  for (const [ch, tails] of Object.entries(EATEN)) {
+    out = out
+      .replace(new RegExp(`\\\\${ch}(?=[A-Za-z])`, 'g'), `\\${LETTER[ch]}`)
+      .replace(new RegExp(`${ch}(?=(?:${tails}))`, 'g'), `\\${LETTER[ch]}`);
+  }
+  return out
     .replace(new RegExp(`\\\\\\n(?=(?:${NEWLINE_COMMANDS})(?![A-Za-z]))`, 'g'), '\\n')
     .replace(/\r/g, '')
     .replace(/\t/g, ' ');
@@ -24,10 +35,11 @@ const looksLikeTex = (str) => /\\[A-Za-z]+|[\^_]/.test(str);
 
 // LLMs often emit LaTeX's own delimiters, which markdown reads as escaped
 // brackets: \(x\) renders as "(x)". Rewrite them as dollars.
-function convertLatexDelimiters(s) {
-  return s
+function convertLatexDelimiters(text) {
+  // Odd indices are code spans, which keep their backslashes.
+  return text.split(/(`+[^`]*?`+)/).map((s, i) => (i % 2 ? s : s
     .replace(/\\\[([\s\S]*?)\\\]/g, (m, tex) => (looksLikeTex(tex) ? `\n\n$$\n${tex.trim()}\n$$\n\n` : m))
-    .replace(/\\\(([^\n]*?)\\\)/g, (m, tex) => (tex.trim() ? `$${tex.trim()}$` : m));
+    .replace(/\\\(([^\n]*?)\\\)/g, (m, tex) => (tex.trim() ? `$${tex.trim()}$` : m)))).join('');
 }
 
 // v1 only: equations written with no delimiters at all, either as a whole
@@ -44,9 +56,11 @@ function isTexDense(str) {
 
 function wrapBareTex(s) {
   let inDisplay = false;
+  let inFence = false;
   return s.split('\n').map((line) => {
+    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
     if ((line.match(/\$\$/g) || []).length % 2) inDisplay = !inDisplay;
-    if (inDisplay || /[$`]/.test(line)) return line;
+    if (inFence || inDisplay || /[$`]/.test(line)) return line;
     const bullet = line.match(/^(\s*(?:[-*+]|\d+[.)])\s+)?(.*)$/);
     const [, marker = '', body] = bullet;
     if (isTexDense(body)) return marker ? `${marker}$${body.trim()}$` : `$$\n${body.trim()}\n$$`;
@@ -65,7 +79,9 @@ function wrapBareTex(s) {
 // math: the dollars are currency or mispaired.
 const isProse = (content) =>
   !/[\\^_{}=]/.test(content) && /(^|\s)[A-Za-z]{3,}(\s|$)/.test(content);
-const isMispaired = (content) => isProse(content) && /^\d|^\s|\s$/.test(content);
+const isMispaired = (content) => (isProse(content) && /^\d|^\s|\s$/.test(content))
+  // "$5 to $10", "$100M vs $200M": a number, then a short word.
+  || (/^\d/.test(content) && !/[\\^_{}=]/.test(content) && /\s[A-Za-z]{2,}(\s|$)/.test(content));
 
 // Index of the "$" closing an inline span opened just before `from`, or -1.
 // Inline math may wrap a line but never crosses a blank line.
@@ -203,7 +219,7 @@ const LEGACY_ALIASES = [
 ];
 const legacyMath = (tex) => LEGACY_ALIASES.reduce(
   (t, [re, to]) => t.replace(re, to),
-  tex.replace(/\\{2,}(?=[A-Za-z])/g, '\\').replace(/\\_/g, '_'),
+  tex.replace(/\\_/g, '_'), // doubled backslashes were collapsed in normalizeSummary
 );
 const fixMath = (tex, legacy) => mathSafety(legacy ? legacyMath(tex) : tex);
 

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import PaperCard from './PaperCard';
 import { PER_PAGE, fetchPapers } from '../api';
 
+const paperKey = (p) => p.arxiv_id ?? p.html_url ?? `${p.title}|${p.full_name}`;
+
 // Mounted with key={sort + window}, so a new ranking starts from a fresh
 // list and the previous list's in-flight request is aborted on unmount.
 export default function PaperList({ sort, window, onShowAll }) {
@@ -18,13 +20,13 @@ export default function PaperList({ sort, window, onShowAll }) {
     fetchPapers({ sort, window, page, signal: ctrl.signal })
       .then((data) => {
         const repos = data.repos ?? [];
+        // Pages can shift between requests; drop papers already shown.
         setPapers((prev) => {
-          const seen = new Set(prev.map((p) => p.arxiv_id));
-          const next = [...prev, ...repos.filter((p) => !seen.has(p.arxiv_id))];
-          const more = data.total != null ? page * PER_PAGE < data.total : repos.length === PER_PAGE;
-          setStatus(more ? 'idle' : 'done');
-          return next;
+          const seen = new Set(prev.map(paperKey));
+          return [...prev, ...repos.filter((p) => !seen.has(paperKey(p)))];
         });
+        const more = data.total != null ? page * PER_PAGE < data.total : repos.length === PER_PAGE;
+        setStatus(more ? 'idle' : 'done');
       })
       .catch((err) => {
         if (err.name === 'AbortError') return;
@@ -46,7 +48,7 @@ export default function PaperList({ sort, window, onShowAll }) {
   return (
     <section className="list" aria-busy={status === 'loading'}>
       {papers.map((p, i) => (
-        <PaperCard key={p.arxiv_id} paper={p} rank={i + 1} sort={sort} window={window} />
+        <PaperCard key={paperKey(p)} paper={p} rank={i + 1} sort={sort} window={window} />
       ))}
       <div ref={sentinel} className="list-status" role="status">
         {status === 'loading' && 'Loading papers…'}

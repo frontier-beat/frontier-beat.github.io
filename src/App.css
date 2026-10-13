@@ -270,9 +270,15 @@ a:hover {
 
 .repo {
   display: inline-block;
-  color: var(--muted);
   font-size: var(--fs-meta);
   overflow-wrap: anywhere;
+}
+
+.repo-label {
+  margin-right: 12px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .list-status {

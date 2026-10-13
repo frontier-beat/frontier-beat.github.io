@@ -106,3 +106,22 @@ describe('identifiers in prose', () => {
     expect(normalizeSummary('the __init__ hook and **bold**', 2)).toBe('the \\_\\_init\\_\\_ hook and **bold**');
   });
 });
+
+describe('review findings', () => {
+  it('escapes currency pairs joined by short words', () => {
+    expect(normalizeSummary('costs $5 to $10 per run', 2)).toBe('costs \\$5 to \\$10 per run');
+    expect(normalizeSummary('from $100M vs $200M', 2)).toBe('from \\$100M vs \\$200M');
+  });
+  it('leaves \\( \\) inside code spans alone', () => {
+    const s = 'regex `\\(foo_bar\\)` and math \\(x\\)';
+    expect(normalizeSummary(s, 2)).toBe('regex `\\(foo_bar\\)` and math $x$');
+  });
+  it('keeps a real tab in prose as whitespace', () => {
+    expect(normalizeSummary('Results:\tAccuracy 92', 2)).toBe('Results: Accuracy 92');
+    expect(normalizeSummary(`$${TAB}imes$`, 1)).toBe('$\\times$');
+  });
+  it('does not wrap TeX inside fenced code', () => {
+    const s = '```\nloss = \\alpha \\cdot \\ell_1\n```';
+    expect(normalizeSummary(s, 1)).toBe(s);
+  });
+});
