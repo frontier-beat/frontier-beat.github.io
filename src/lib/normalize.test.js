@@ -100,3 +100,9 @@ describe('delimiter repair', () => {
     expect(normalizeSummary('We use \\textbf in prose rarely', 1)).toBe('We use \\textbf in prose rarely');
   });
 });
+
+describe('identifiers in prose', () => {
+  it('keeps __dunder__ names literal instead of bold', () => {
+    expect(normalizeSummary('the __init__ hook and **bold**', 2)).toBe('the \\_\\_init\\_\\_ hook and **bold**');
+  });
+});

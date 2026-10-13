@@ -219,9 +219,12 @@ function joinTokens(tokens, legacy) {
         if (!legacy) return `$$${fixMath(t.value, false)}$$`;
         // Display math on its own lines, surrounded by blank lines (contract rule 2).
         return `\u0000$$\n${fixMath(t.value.trim().replace(/\\+$/, '').trimEnd(), true)}\n$$\u0000`;
-      case 'text':
+      case 'text': {
+        // "__init__" is a Python name, not bold (the contract's bold is **).
+        const v = t.value.replace(/(^|[^\w\\])__([A-Za-z][\w]*?)__(?![\w])/g, (m, pre, name) => `${pre}\\_\\_${name}\\_\\_`);
         // v1: a lone Greek command in prose ("with \theta fixed").
-        return legacy ? t.value.replace(BARE_GREEK, (m) => `$${m}$`) : t.value;
+        return legacy ? v.replace(BARE_GREEK, (m) => `$${m}$`) : v;
+      }
       default:
         return t.value;
     }

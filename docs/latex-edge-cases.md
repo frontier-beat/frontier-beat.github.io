@@ -15,7 +15,10 @@ contract rules 1-4).
 
 Checks: `npm test` (Node render of every fixture, prints failures) and
 `npm run test:e2e` (headless Chromium over the `/?fixtures=1` page, counts
-`.katex-error` nodes, unknown-command spans and console errors).
+`.katex-error` nodes, unknown-command spans, card overflow and console
+errors at 375 px and 1280 px). Last browser run (2026-10-13): valid-v2 edge
+cases 0 errors, v1 6/936 rows with errors, no card or page overflow, no
+console errors, at both widths.
 
 ## Status
 
@@ -52,6 +55,8 @@ Counts are rows in the 936-row v1 set.
 | 15 | `\text{}` containing `$...$` | `$y = \text{for all $x$ in } S$` | edge case | The inner `$` closes the outer math in markdown | Not fixable in the renderer. Contract rule 3 |
 | 16 | HTML entities in math | `$a &lt; b$` arrives as `&` + `lt;` | edge case | HTML-escaped source | Renderer (all versions): decodes `&lt; &gt; &amp; &nbsp;` inside math |
 | 17 | Block markers in titles | A title starting `1. ` or `# ` would become a list or heading | none seen | Markdown | Renderer: escaped in `normalizeTitle` |
+| 19 | `__name__` in prose | `the __init__ hook` renders as bold "init" | edge case | CommonMark strong emphasis | Renderer (all versions): `__identifier__` is escaped (contract bold is `**`). **Summarizer rule I** |
+| 20 | Long inline math | A whole sentence inside `\text{}` in `$...$` cannot line-break and widened 3 cards past 375 px | 3 | KaTeX inline boxes do not wrap | CSS: inline math is a horizontal scroll box capped at the card width, like display math |
 | 18 | Placeholder keys | `$loss_term$` (a JSON-era equation key) | 0 real cases | The "158 placeholder" count in contracts.md matched single-variable math such as `$x$` and `$y_i$`, which is valid | Renderer (v1 only): `$word_word$` with a 3+ letter first word renders as text |
 
 Survives without any special handling (verified by the edge-case set): `$`
@@ -86,3 +91,7 @@ The validator (`src/summary_format.py`) should reject strings that break them.
   works, but `\alpha` is preferred.
 - **H. No `equation`, `align`, `\label`, `\eqref`, `\tag`.** Multi-line
   display uses `aligned` (already contract rule 3).
+- **I. Code identifiers go in backticks** (`` `__init__` ``, `` `max_new_tokens` ``).
+  A bare `__init__` is bold in markdown.
+- **J. Keep `\text{}` to a word or two inside inline math.** A sentence in
+  `\text{}` cannot wrap and scrolls sideways on a phone.

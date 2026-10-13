@@ -233,7 +233,22 @@ a:hover {
   font: 0.9em ui-monospace, Menlo, Consolas, monospace;
 }
 
-/* Equations scroll inside the card; they never widen it. */
+/* Equations scroll inside the card; they never widen it. Inline math
+   becomes a scroll box too, because a long \text{} run cannot wrap. */
+.summary .katex {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  vertical-align: middle;
+}
+
+.summary .katex-display > .katex {
+  display: block;
+  max-width: none;
+  overflow: visible;
+}
+
 .katex-display {
   margin: 12px 0;
   padding: 4px 0;
