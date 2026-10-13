@@ -2,12 +2,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import ReactMarkdown from 'react-markdown';
-import { InlineMath, BlockMath } from 'react-katex';
+import katex from 'katex';
 import { FaStar, FaCode, FaMoon, FaSun, FaCoffee, FaHeart } from 'react-icons/fa';
 import 'katex/dist/katex.min.css';
 import './App.css';
 import lightLogo from './assets/light-logo.png';
 import darkLogo from './assets/dark-logo.png';
+
+// Minimal stand-ins for react-katex (removed with the CRA toolchain).
+const Math = ({ children, display }) => (
+  <span dangerouslySetInnerHTML={{ __html: katex.renderToString(children, { displayMode: display, throwOnError: false }) }} />
+);
+const InlineMath = (props) => <Math {...props} />;
+const BlockMath = (props) => <Math {...props} display />;
 
 const renderMath = (text) => {
   if (typeof text !== 'string') {
