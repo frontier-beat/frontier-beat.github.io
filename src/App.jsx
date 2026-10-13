@@ -1,260 +1,93 @@
-import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
-import InfiniteScroll from 'react-infinite-scroll-component';
-import ReactMarkdown from 'react-markdown';
-import katex from 'katex';
-import { FaStar, FaCode, FaMoon, FaSun, FaCoffee, FaHeart } from 'react-icons/fa';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
+import { FaCoffee, FaHeart, FaMoon, FaSun } from 'react-icons/fa';
 import 'katex/dist/katex.min.css';
 import './App.css';
 import lightLogo from './assets/light-logo.png';
 import darkLogo from './assets/dark-logo.png';
+import PaperList from './components/PaperList';
+import RankingControls from './components/RankingControls';
+import { DEFAULT_SORT, DEFAULT_WINDOW, SORTS, WINDOWS } from './api';
 
-// Minimal stand-ins for react-katex (removed with the CRA toolchain).
-const Math = ({ children, display }) => (
-  <span dangerouslySetInnerHTML={{ __html: katex.renderToString(children, { displayMode: display, throwOnError: false }) }} />
-);
-const InlineMath = (props) => <Math {...props} />;
-const BlockMath = (props) => <Math {...props} display />;
+const FixturePage = lazy(() => import('./components/FixturePage'));
 
-const renderMath = (text) => {
-  if (typeof text !== 'string') {
-    return text;
-  }
-  
-  // Split the text into LaTeX and non-LaTeX parts
-  const parts = text.split(/(\$[^$\n]+?\$)/);
-  
-  return parts.map((part, index) => {
-    if (part.startsWith('$') && part.endsWith('$')) {
-      // Unescape underscores before passing to InlineMath
-      const unescapedLatex = part.slice(1, -1).replace(/\\_/g, '_');
-      return <span key={index} className="katex-inline"><InlineMath>{unescapedLatex}</InlineMath></span>;
-    } else {
-      // Handle escaped backslashes
-      const processedText = part.replace(/\\\\/g, '\\');
-      return processedText;
-    }
+function readRanking() {
+  const q = new URLSearchParams(window.location.search);
+  const pick = (key, options, fallback) => (options.some((o) => o.value === q.get(key)) ? q.get(key) : fallback);
+  return { sort: pick('sort', SORTS, DEFAULT_SORT), window: pick('window', WINDOWS, DEFAULT_WINDOW) };
+}
+
+function writeRanking({ sort, window: win }) {
+  const q = new URLSearchParams(window.location.search);
+  q.set('sort', sort);
+  q.set('window', win);
+  if (sort === DEFAULT_SORT && win === DEFAULT_WINDOW) { q.delete('sort'); q.delete('window'); }
+  const search = q.toString();
+  window.history.pushState(null, '', `${window.location.pathname}${search ? `?${search}` : ''}`);
+}
+
+function useTheme() {
+  const [dark, setDark] = useState(() => document.documentElement.dataset.theme === 'dark');
+  useEffect(() => {
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  }, [dark]);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = (e) => { if (!localStorage.getItem('theme')) setDark(e.matches); };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  const toggle = () => setDark((d) => {
+    try { localStorage.setItem('theme', d ? 'light' : 'dark'); } catch { /* storage blocked */ }
+    return !d;
   });
-};
-
-const renderTitle = (text) => {
-  return renderMath(text);
-};
-
-const applyTheme = (isDark) => {
-  document.body.classList.toggle('dark-mode', isDark);
-  document.body.classList.toggle('light-mode', !isDark);
-};
-
-const RepoCard = ({ repo }) => {
-  const formattedRate = repo.hourly_rate.toFixed(2);
-  const showRate = formattedRate !== '0.00';
-
-  const components = {
-    p: ({ children }) => <p>{React.Children.map(children, child => 
-      typeof child === 'string' ? renderMath(child) : child
-    )}</p>,
-    li: ({ children }) => <li>{React.Children.map(children, child => 
-      typeof child === 'string' ? renderMath(child) : child
-    )}</li>,
-    ul: ({ children }) => <ul>{children}</ul>,
-    code: ({ node, inline, className, children, ...props }) => {
-      const match = /language-(\w+)/.exec(className || '')
-      return !inline && match ? (
-        <pre className={className} {...props}>
-          <code className={className}>{children}</code>
-        </pre>
-      ) : (
-        <code className={className} {...props}>
-          {children}
-        </code>
-      )
-    },
-  };
-
-  const escapeLatex = (text) => {
-    return text.replace(/\$(.*?)\$/g, (match, p1) => {
-      return '$' + p1.replace(/_/g, '\\_') + '$';
-    });
-  };
-
-  const processContent = (content) => {
-    // Escape underscores in LaTeX expressions
-    const escapedContent = escapeLatex(content);
-    
-    // Split on block-level equations
-    const parts = escapedContent.split(/(\$\$[\s\S]*?\$\$)/);
-    
-    return parts.map((part, index) => {
-      if (part.startsWith('$$') && part.endsWith('$$')) {
-        return <div key={index} className="katex-display"><BlockMath>{part.slice(2, -2).replace(/\\_/g, '_')}</BlockMath></div>;
-      } else {
-        // Use ReactMarkdown for everything else, including inline LaTeX
-        return <ReactMarkdown key={index} components={components}>{part}</ReactMarkdown>;
-      }
-    });
-  };
-
-  return (
-    <div className="repo-card">
-      <div className="repo-card-content">
-        <h2>
-          <a href={repo.html_link} target="_blank" rel="noopener noreferrer">
-            {renderTitle(repo.title)}
-          </a>
-        </h2>
-        <div className="paper-summary">
-          {processContent(repo.paper_summary)}
-        </div>
-        <div className="repo-stats">
-          <FaCode />
-          <a href={repo.html_url} target="_blank" rel="noopener noreferrer">
-            {repo.full_name}
-          </a>
-        </div>
-        <div className="repo-stats">
-          <FaStar />
-          {repo.star_count}
-          {showRate && ` (+${formattedRate}/hour)`}
-        </div>
-      </div>
-    </div>
-  );
-};
+  return [dark, toggle];
+}
 
 const Footer = () => (
-  <div className="footer">
-    <FaCoffee size={10}/> Freshly brewed with <FaHeart size={8}/> at the <a 
-      href="https://www.recurse.com/" 
-      target="_blank" 
-      rel="noopener noreferrer"
-    >Recurse Center</a> in New York © {new Date().getFullYear()} <a
-      href="https://eric-bolton.github.io/"
-      target="_blank"
-      rel="noopener noreferrer"
-    >Eric Bolton</a>. All rights reserved.
-  </div>
-  );
-
-const LogoCard = ({ isDarkMode }) => (
-  <div className="logo-card" onClick={() => window.location.reload()}>
-    <img src={isDarkMode ? darkLogo : lightLogo} alt="Frontier Beat Logo" className="App-logo" />
-  </div>
+  <footer className="footer">
+    <FaCoffee size={10} /> Freshly brewed with <FaHeart size={8} /> at the{' '}
+    <a href="https://www.recurse.com/" target="_blank" rel="noopener noreferrer">Recurse Center</a> in New York ©{' '}
+    {new Date().getFullYear()}{' '}
+    <a href="https://eric-bolton.github.io/" target="_blank" rel="noopener noreferrer">Eric Bolton</a>. All rights reserved.
+  </footer>
 );
 
-const WelcomeMessage = () => (
-  <div className="welcome-message">
-    <h2>Today's Trending Open-Source Machine Learning Papers</h2>
-  </div>
-);
-
-function App() {
-  const [repos, setRepos] = useState([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-      return savedTheme === 'dark';
-    }
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
-  const initialFetchDone = useRef(false);
+export default function App() {
+  const [dark, toggleTheme] = useTheme();
+  const [ranking, setRanking] = useState(readRanking);
+  const fixtures = new URLSearchParams(window.location.search).has('fixtures');
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e) => {
-      setIsDarkMode(e.matches);
-    };
-
-    mediaQuery.addListener(handleChange);
-
-    return () => mediaQuery.removeListener(handleChange);
+    const onPop = () => setRanking(readRanking());
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  useEffect(() => {
-    applyTheme(isDarkMode);
-    if (!initialFetchDone.current) {
-      fetchRepos(1);
-      initialFetchDone.current = true;
-    }
+  const changeRanking = useCallback((next) => {
+    writeRanking(next);
+    setRanking(next);
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
-    applyTheme(isDarkMode);
-  }, [isDarkMode]);
-
-  const toggleTheme = () => {
-    setIsDarkMode(prevMode => !prevMode);
-  };
-  
-  const fetchRepos = async (pageNum) => {
-    try {
-      const response = await axios.get(`https://api.frontier-beat.site/top_papers?page=${pageNum}&per_page=10`);
-      const newRepos = response.data.repos;
-      setRepos((prevRepos) => [...prevRepos, ...newRepos]);
-      setPage(pageNum + 1);
-      if (newRepos.length < 10) {
-        setHasMore(false);
-      }
-    } catch (error) {
-      console.error('Error fetching repos:', error);
-    }
-  };
-
-  const backgroundRef = useRef(null);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrolled = window.pageYOffset;
-      if (backgroundRef.current) {
-        const yPosition = -(scrolled * 0.005) % 50; // The % 100 creates the repeating effect
-        backgroundRef.current.style.transform = `translate3d(0, ${yPosition}%, 0)`;
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
-  
   return (
     <>
-      <div className="background" ref={backgroundRef}></div>
-      <div className="App">
-        <div className="theme-toggle" onClick={toggleTheme}>
-          {isDarkMode ? <FaSun /> : <FaMoon />}
-        </div>
-        <InfiniteScroll
-          dataLength={repos.length}
-          next={() => fetchRepos(page)}
-          hasMore={hasMore}
-          loader={<div className="loading">Loading trending papers...</div>}
-          endMessage={
-            <p style={{ textAlign: 'center' }}>
-              <b>You've reached the end of our trending ML papers list!</b>
-            </p>
-          }
-        >
-          {repos.map((repo, index) => (
-            <React.Fragment key={repo.id}>
-              {index === 0 && (
-                <>
-                  <LogoCard isDarkMode={isDarkMode} />
-                  <WelcomeMessage />
-                </>
-              )}
-              <RepoCard repo={repo} />
-            </React.Fragment>
-          ))}
-        </InfiniteScroll>
+      <div className="page">
+        <header className="masthead">
+          <a href="/" aria-label="Frontier Beat home"><img className="logo" src={dark ? darkLogo : lightLogo} alt="Frontier Beat" /></a>
+          <button type="button" className="button icon" onClick={toggleTheme} aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}>
+            {dark ? <FaSun /> : <FaMoon />}
+          </button>
+        </header>
+        <h1 className="page-title">Open-source machine learning papers</h1>
+        {fixtures ? (
+          <Suspense fallback={<p className="list-status">Loading fixtures…</p>}><FixturePage /></Suspense>
+        ) : (
+          <>
+            <RankingControls sort={ranking.sort} window={ranking.window} onChange={changeRanking} />
+            <PaperList key={`${ranking.sort}:${ranking.window}`} sort={ranking.sort} window={ranking.window} />
+          </>
+        )}
       </div>
       <Footer />
     </>
   );
 }
-
-export default App;
