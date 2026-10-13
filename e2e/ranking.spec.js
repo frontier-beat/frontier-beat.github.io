@@ -39,16 +39,23 @@ test('changing sort updates the URL, refetches and resets the list; back restore
   await context.close();
 });
 
-test('keyboard: arrow keys move through sorts; window is disabled for Most stars', async ({ browser }) => {
+test('keyboard: arrow keys move through sorts; window filters by published date for Most stars and Newest', async ({ browser }) => {
   const { context, page } = await openPage(browser);
   await page.goto('/');
+  const hint = page.locator('.segmented .hint');
+  await expect(hint).toHaveCount(0);
   await page.getByRole('radio', { name: 'Trending' }).focus();
   const req = apiRequest(page);
   await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('radio', { name: 'Most stars' })).toBeChecked();
-  expect(params(await req)).toMatchObject({ sort: 'stars', window: 'all' });
-  await expect(page.getByRole('radio', { name: '30d' })).toBeDisabled();
+  expect(params(await req)).toMatchObject({ sort: 'stars', window: 'month' });
+  await expect(page.getByRole('radio', { name: '30d' })).toBeEnabled();
+  await expect(hint).toHaveText('published within');
   await expect(page).toHaveURL(/\?sort=stars&window=month$/);
+  await page.getByText('Newest', { exact: true }).click();
+  await expect(hint).toHaveText('published within');
+  await page.getByText('Stars gained', { exact: true }).click();
+  await expect(hint).toHaveCount(0);
   await context.close();
 });
 

@@ -1,10 +1,10 @@
-import { SORTS, WINDOWS, sortUsesWindow } from '../api';
+import { SORTS, WINDOWS, windowFiltersPublished } from '../api';
 
 // Native radio groups: arrow keys, focus and form semantics come for free.
-function Segmented({ name, label, options, value, onChange, disabled }) {
+function Segmented({ name, label, hint, options, value, onChange }) {
   return (
-    <fieldset className="segmented" disabled={disabled}>
-      <legend>{label}</legend>
+    <fieldset className="segmented">
+      <legend>{label}{hint && <span className="hint">{hint}</span>}</legend>
       <div className="segments">
         {options.map((o) => (
           <label key={o.value}>
@@ -27,7 +27,7 @@ export default function RankingControls({ sort, window, onChange }) {
         options={WINDOWS}
         value={window}
         onChange={(v) => onChange({ sort, window: v })}
-        disabled={!sortUsesWindow(sort)}
+        hint={windowFiltersPublished(sort) ? 'published within' : undefined}
       />
     </div>
   );

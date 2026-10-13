@@ -75,7 +75,8 @@ function topPapers(q) {
 
   let list = papers;
   const cutoff = NOW - WINDOW_DAYS[window] * 86400e3;
-  if (sort === 'new') list = list.filter((p) => Date.parse(p.published_date) >= cutoff);
+  // stars/new: the window filters by published date (contracts.md).
+  if (sort === 'new' || sort === 'stars') list = list.filter((p) => Date.parse(p.published_date) >= cutoff);
   const key = {
     trending: (p) => [p.hourly_rate, p.star_count],
     stars: (p) => [p.star_count, 0],

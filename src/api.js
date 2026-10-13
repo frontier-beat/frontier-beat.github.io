@@ -20,10 +20,9 @@ export const DEFAULT_SORT = 'trending';
 export const DEFAULT_WINDOW = 'month';
 export const PER_PAGE = 10;
 
-// `stars` is a current total, so a time window does not change it. The UI
-// keeps the chosen window for the other sorts but asks the API for `all`.
-export const sortUsesWindow = (sort) => sort !== 'stars';
-export const effectiveWindow = (sort, window) => (sortUsesWindow(sort) ? window : 'all');
+// For `stars` and `new` the window filters papers by arXiv published date
+// (contracts.md); for `trending` and `gained` it limits the star samples.
+export const windowFiltersPublished = (sort) => sort === 'stars' || sort === 'new';
 
 export async function fetchPapers({ sort, window, page, signal }) {
   const params = new URLSearchParams({ sort, window, page: String(page), per_page: String(PER_PAGE) });

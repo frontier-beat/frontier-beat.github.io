@@ -170,12 +170,11 @@ a:hover {
   outline-offset: 2px;
 }
 
-.segmented:disabled {
-  opacity: 0.4;
-}
-
-.segmented:disabled span {
-  cursor: not-allowed;
+.hint {
+  margin-left: 8px;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .button {
