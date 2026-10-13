@@ -57,6 +57,9 @@ const papers = rows.map((r) => {
     published_date: toIso(r.published_date),
     primary_category: r.primary_category,
     summary_version: r.summary_version,
+    // Optional fields (contracts.md 18:20Z): a third of rows have only two
+    // hours of history, a third a full history, a third omit the fields.
+    history: rnd(),
   };
 });
 
@@ -85,7 +88,15 @@ function topPapers(q) {
     return b1 - a1 || b2 - a2;
   });
   const start = (page - 1) * perPage;
-  const repos = list.slice(start, start + +perPage).map(({ gained, ...p }) => ({ ...p, stars_gained: gained[window] }));
+  const repos = list.slice(start, start + +perPage).map(({ gained, history, ...p }) => {
+    const row = { ...p, stars_gained: gained[window] };
+    if (history < 2 / 3) {
+      const short = history < 1 / 3;
+      row.gained_since = new Date(short ? Date.now() - 2 * 3600e3 : Date.now() - 400 * 86400e3).toISOString();
+      row.rate_provisional = short;
+    }
+    return row;
+  });
   return [200, { page: +page, per_page: +perPage, sort, window, total: list.length, repos }];
 }
 

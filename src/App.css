@@ -213,8 +213,20 @@ a:hover {
 
 .strip-stats {
   display: flex;
+  flex: none;
   gap: 16px;
   margin-left: auto;
+}
+
+.star {
+  font-size: 0.85em;
+  vertical-align: -0.05em;
+}
+
+.est {
+  margin-left: 4px;
+  color: var(--muted);
+  cursor: help;
 }
 
 .strip [data-active] {
@@ -337,8 +349,27 @@ a:hover {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  /* Phone: only the stat that matches the current sort. */
-  .strip-stats span:not([data-active]) {
-    display: none;
+  /* Phone: one line holding the category and the one number the list is
+     sorted by; a long category name is cut with an ellipsis. */
+  .strip {
+    flex-wrap: nowrap;
+  }
+
+  .strip > * {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  .strip-stats > span:not([data-active]),
+  .date:not([data-active]) {
+    display: none; /* the published date shows when it is the sort (Newest) */
+  }
+
+  .category {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }

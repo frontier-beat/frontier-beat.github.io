@@ -1,6 +1,7 @@
 import { memo } from 'react';
+import { FaStar } from 'react-icons/fa';
 import { Summary, Title } from './Markdown';
-import { WINDOWS } from '../api';
+import { categoryName, gainSpan } from '../lib/strip';
 
 const fmt = new Intl.NumberFormat('en-US');
 const fmtRate = (r) => (r >= 100 ? fmt.format(Math.round(r)) : r.toFixed(1));
@@ -8,22 +9,38 @@ const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 // API fields go into href; allow only web links.
 const safeUrl = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null);
 const day = (iso) => (iso ? String(iso).slice(0, 10) : null);
+const Star = () => <FaStar className="star" aria-label="stars" />;
 
 // Departure-board strip: category and date on the left; the numbers on the
 // right, with the one the list is sorted by in full contrast.
 function Strip({ paper, sort, window }) {
-  const windowLabel = WINDOWS.find((w) => w.value === window)?.label;
   const stats = [
-    isNum(paper.star_count) && { key: 'stars', text: `${fmt.format(paper.star_count)} stars` },
-    isNum(paper.hourly_rate) && fmtRate(paper.hourly_rate) !== '0.0' && { key: 'trending', text: `+${fmtRate(paper.hourly_rate)}/h` },
-    isNum(paper.stars_gained) && { key: 'gained', text: `+${fmt.format(paper.stars_gained)} ${windowLabel ?? ''}`.trim() },
+    isNum(paper.star_count) && {
+      key: 'stars',
+      body: <><Star /> {fmt.format(paper.star_count)}</>,
+    },
+    isNum(paper.hourly_rate) && fmtRate(paper.hourly_rate) !== '0.0' && {
+      key: 'trending',
+      body: (
+        <>
+          +{fmtRate(paper.hourly_rate)} <Star />/h
+          {paper.rate_provisional && <span className="est" title="Estimate: less than 24 hours of star history so far">est.</span>}
+        </>
+      ),
+    },
+    isNum(paper.stars_gained) && {
+      key: 'gained',
+      body: <>+{fmt.format(paper.stars_gained)} <Star /> {gainSpan(paper, window)}</>,
+    },
   ].filter(Boolean);
   return (
     <div className="strip">
-      {paper.primary_category && <span>{paper.primary_category}</span>}
-      {paper.published_date && <span data-active={sort === 'new' || undefined}>{day(paper.published_date)}</span>}
+      {paper.primary_category && (
+        <span className="category" title={paper.primary_category}>{categoryName(paper.primary_category)}</span>
+      )}
+      {paper.published_date && <span className="date" data-active={sort === 'new' || undefined}>{day(paper.published_date)}</span>}
       <span className="strip-stats">
-        {stats.map((s) => <span key={s.key} data-active={sort === s.key || undefined}>{s.text}</span>)}
+        {stats.map((s) => <span key={s.key} data-active={sort === s.key || undefined}>{s.body}</span>)}
       </span>
     </div>
   );
