@@ -47,8 +47,8 @@ export default function PaperList({ sort, window, onShowAll }) {
 
   return (
     <section className="list" aria-busy={status === 'loading'}>
-      {papers.map((p, i) => (
-        <PaperCard key={paperKey(p)} paper={p} rank={i + 1} sort={sort} window={window} />
+      {papers.map((p) => (
+        <PaperCard key={paperKey(p)} paper={p} sort={sort} window={window} />
       ))}
       <div ref={sentinel} className="list-status" role="status">
         {status === 'loading' && 'Loading papers…'}

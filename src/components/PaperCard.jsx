@@ -9,9 +9,9 @@ const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const safeUrl = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null);
 const day = (iso) => (iso ? String(iso).slice(0, 10) : null);
 
-// Departure-board strip: rank, category, date on the left; the numbers on
-// the right, with the one the list is sorted by in full contrast.
-function Strip({ paper, rank, sort, window }) {
+// Departure-board strip: category and date on the left; the numbers on the
+// right, with the one the list is sorted by in full contrast.
+function Strip({ paper, sort, window }) {
   const windowLabel = WINDOWS.find((w) => w.value === window)?.label;
   const stats = [
     isNum(paper.star_count) && { key: 'stars', text: `${fmt.format(paper.star_count)} stars` },
@@ -20,7 +20,6 @@ function Strip({ paper, rank, sort, window }) {
   ].filter(Boolean);
   return (
     <div className="strip">
-      {rank != null && <span className="rank">{String(rank).padStart(2, '0')}</span>}
       {paper.primary_category && <span>{paper.primary_category}</span>}
       {paper.published_date && <span data-active={sort === 'new' || undefined}>{day(paper.published_date)}</span>}
       <span className="strip-stats">
@@ -30,12 +29,12 @@ function Strip({ paper, rank, sort, window }) {
   );
 }
 
-function PaperCard({ paper, rank, sort, window, ...rest }) {
+function PaperCard({ paper, sort, window, ...rest }) {
   const paperUrl = safeUrl(paper.html_link);
   const repoUrl = safeUrl(paper.html_url);
   return (
     <article className="card" {...rest}>
-      <Strip paper={paper} rank={rank} sort={sort} window={window} />
+      <Strip paper={paper} sort={sort} window={window} />
       <h2 className="card-title">
         {paperUrl ? (
           <a href={paperUrl} target="_blank" rel="noopener noreferrer"><Title text={paper.title} /></a>

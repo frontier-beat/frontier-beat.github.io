@@ -1,9 +1,9 @@
-import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { FaCoffee, FaHeart, FaMoon, FaSun } from 'react-icons/fa';
 import 'katex/dist/katex.min.css';
 import './App.css';
-import lightLogo from './assets/light-logo.png';
-import darkLogo from './assets/dark-logo.png';
+import lightLogo from './assets/logo-light.png';
+import darkLogo from './assets/logo-dark.png';
 import PaperList from './components/PaperList';
 import RankingControls from './components/RankingControls';
 import { DEFAULT_SORT, DEFAULT_WINDOW, SORTS, WINDOWS, effectiveWindow } from './api';
@@ -43,6 +43,30 @@ function useTheme() {
   return [dark, toggle];
 }
 
+// Space/sky backdrop. The images are two identical halves stacked, so
+// drifting the 800%-tall layer by up to 50% of its height loops seamlessly
+// (the original effect from 3462ea1).
+function Background() {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+    let frame = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const y = -(window.scrollY * 0.005) % 50;
+        if (ref.current) ref.current.style.transform = `translate3d(0, ${y}%, 0)`;
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', onScroll);
+    };
+  }, []);
+  return <div className="background" ref={ref} aria-hidden="true" />;
+}
+
 const Footer = () => (
   <footer className="footer">
     <FaCoffee size={10} /> Freshly brewed with <FaHeart size={8} /> at the{' '}
@@ -71,12 +95,13 @@ export default function App() {
 
   return (
     <>
+      <Background />
+      <button type="button" className="button icon theme-toggle" onClick={toggleTheme} aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}>
+        {dark ? <FaSun /> : <FaMoon />}
+      </button>
       <div className="page">
         <header className="masthead">
           <a href="/" aria-label="Frontier Beat home"><img className="logo" src={dark ? darkLogo : lightLogo} alt="Frontier Beat" /></a>
-          <button type="button" className="button icon" onClick={toggleTheme} aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}>
-            {dark ? <FaSun /> : <FaMoon />}
-          </button>
         </header>
         <h1 className="page-title">Open-source machine learning papers</h1>
         {fixtures ? (

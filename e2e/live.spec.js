@@ -4,7 +4,7 @@
 import { test, expect } from '@playwright/test';
 import { VIEWPORTS, openPage } from './helpers';
 
-const target = process.env.E2E_BASE_URL ? 'deployed' : 'live';
+const target = process.env.SHOT_PREFIX || (process.env.E2E_BASE_URL ? 'deployed' : 'live');
 const katexErrors = (page) => page.locator('.card .katex-error, .card .katex [style*="color:#cc0000"]').count();
 
 for (const theme of ['light', 'dark']) {
@@ -26,11 +26,18 @@ for (const theme of ['light', 'dark']) {
       // back to the top come out blank above the fold.
       await page.screenshot({ path: `docs/screenshots/${target}-${name}-${theme}.png` });
 
-      for (const sort of ['Most stars', 'Stars gained', 'Newest', 'Trending']) {
-        const first = await page.locator('.card-title').first().textContent();
-        await page.getByText(sort, { exact: true }).click();
+      // Each switch must request the new sort and reload the list. (Titles
+      // can legitimately coincide: the top trending paper may also have the
+      // most stars.) An empty windowed result falls back to all time.
+      for (const [label, value] of [['Most stars', 'stars'], ['Stars gained', 'gained'], ['Newest', 'new'], ['Trending', 'trending']]) {
+        const response = page.waitForResponse((r) => r.url().includes('/top_papers') && new URL(r.url()).searchParams.get('sort') === value);
+        await page.getByText(label, { exact: true }).click();
+        expect((await response).status()).toBe(200);
+        await expect(page.locator('.card').first().or(status.getByRole('button', { name: 'Show all time' }))).toBeVisible({ timeout: 30_000 });
+        if (await status.getByRole('button', { name: 'Show all time' }).isVisible()) {
+          await status.getByRole('button', { name: 'Show all time' }).click();
+        }
         await expect(page.locator('.card')).toHaveCount(10, { timeout: 30_000 });
-        if (sort !== 'Trending') await expect(page.locator('.card-title').first()).not.toHaveText(first);
       }
       await page.mouse.wheel(0, 30000);
       await expect(page.locator('.card')).toHaveCount(20, { timeout: 30_000 });

@@ -4,7 +4,6 @@ import { openPage } from './helpers';
 
 const apiRequest = (page) => page.waitForRequest((r) => r.url().includes('/top_papers'));
 const params = (req) => Object.fromEntries(new URL(req.url()).searchParams);
-const ranks = (page) => page.locator('.card .rank').allTextContents();
 
 test('default ranking is trending + 30d and loads page 1', async ({ browser }) => {
   const { context, page, errors } = await openPage(browser);
@@ -14,7 +13,6 @@ test('default ranking is trending + 30d and loads page 1', async ({ browser }) =
   await expect(page.getByRole('radio', { name: 'Trending' })).toBeChecked();
   await expect(page.getByRole('radio', { name: '30d' })).toBeChecked();
   await expect(page.locator('.card')).toHaveCount(10);
-  expect((await ranks(page))[0]).toBe('01');
   expect(errors).toEqual([]);
   await context.close();
 });
@@ -31,7 +29,6 @@ test('changing sort updates the URL, refetches and resets the list; back restore
   expect(params(await req)).toMatchObject({ sort: 'gained', window: 'month', page: '1' });
   await expect(page).toHaveURL(/\?sort=gained&window=month$/);
   await expect(page.locator('.card')).toHaveCount(10);
-  expect((await ranks(page))[0]).toBe('01');
   expect(await page.evaluate(() => window.scrollY)).toBeLessThan(2000);
 
   await page.goBack();
