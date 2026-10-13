@@ -32,12 +32,16 @@ for (const theme of ['light', 'dark']) {
       for (const [label, value] of [['Most stars', 'stars'], ['Stars gained', 'gained'], ['Newest', 'new'], ['Trending', 'trending']]) {
         const response = page.waitForResponse((r) => r.url().includes('/top_papers') && new URL(r.url()).searchParams.get('sort') === value);
         await page.getByText(label, { exact: true }).click();
-        expect((await response).status()).toBe(200);
+        const res = await response;
+        expect(res.status()).toBe(200);
+        const first = (await res.json()).repos[0];
         await expect(page.locator('.card').first().or(status.getByRole('button', { name: 'Show all time' }))).toBeVisible({ timeout: 30_000 });
         if (await status.getByRole('button', { name: 'Show all time' }).isVisible()) {
           await status.getByRole('button', { name: 'Show all time' }).click();
         }
         await expect(page.locator('.card')).toHaveCount(10, { timeout: 30_000 });
+        // The list shows this sort's data, not the previous list.
+        if (first) await expect(page.locator('.card-title a').first()).toHaveAttribute('href', first.html_link);
       }
       await page.mouse.wheel(0, 30000);
       await expect(page.locator('.card')).toHaveCount(20, { timeout: 30_000 });

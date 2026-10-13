@@ -43,21 +43,21 @@ function useTheme() {
   return [dark, toggle];
 }
 
-// Space/sky backdrop. The images are two identical halves stacked, so
-// drifting the 800%-tall layer by up to 50% of its height loops seamlessly
-// (the original effect from 3462ea1).
+// Space/sky backdrop. The image tiles vertically; scrolling drifts it at
+// the 2024 site's speed (0.005% of an 8-screen layer per pixel scrolled).
 function Background() {
   const ref = useRef(null);
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
     let frame = 0;
+    const place = () => {
+      if (ref.current) ref.current.style.backgroundPositionY = `${-window.scrollY * window.innerHeight * 0.0004}px`;
+    };
     const onScroll = () => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const y = -(window.scrollY * 0.005) % 50;
-        if (ref.current) ref.current.style.transform = `translate3d(0, ${y}%, 0)`;
-      });
+      frame = requestAnimationFrame(place);
     };
+    place(); // pages can open already scrolled (reload, back/forward)
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       cancelAnimationFrame(frame);
