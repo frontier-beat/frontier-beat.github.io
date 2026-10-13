@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { categoryName, gainSpan } from './strip';
+import { categoryName, gainSpan, signed } from './strip';
 
 describe('categoryName', () => {
   it('uses the readable names Eric asked for', () => {
@@ -21,15 +21,31 @@ describe('categoryName', () => {
 
 describe('gainSpan', () => {
   const now = Date.parse('2026-10-13T18:30:00Z');
+  const utc = (p, w) => gainSpan(p, w, now, 'UTC');
   it('uses the window label when no gained_since is known', () => {
-    expect(gainSpan({}, 'month', now)).toBe('30D');
+    expect(utc({}, 'month')).toBe('30d');
+  });
+  it('parses Postgres-style timestamps', () => {
+    expect(utc({ gained_since: '2026-10-13 16:05:00+00' }, 'month')).toBe('since Oct 13');
+    expect(utc({ gained_since: 'not a date' }, 'week')).toBe('7d');
   });
   it('uses the window label when history covers the window', () => {
-    expect(gainSpan({ gained_since: '2026-09-13T18:00:00Z' }, 'month', now)).toBe('30D');
-    expect(gainSpan({ gained_since: '2026-10-12T18:40:00Z' }, 'day', now)).toBe('24H');
+    expect(utc({ gained_since: '2026-09-13T18:00:00Z' }, 'month')).toBe('30d');
+    expect(utc({ gained_since: '2026-10-12T18:40:00Z' }, 'day')).toBe('24h');
   });
   it('labels the real span when history is shorter than the window', () => {
-    expect(gainSpan({ gained_since: '2026-10-13T16:05:00Z' }, 'month', now)).toBe('since Oct 13');
-    expect(gainSpan({ gained_since: '2024-08-06T00:00:00Z' }, 'all', now)).toBe('since Aug 6, 2024');
+    expect(utc({ gained_since: '2026-10-13T16:05:00Z' }, 'month')).toBe('since Oct 13');
+    expect(utc({ gained_since: '2024-08-06T00:00:00Z' }, 'all')).toBe('since Aug 6, 2024');
+  });
+  it('formats the date in the given time zone', () => {
+    expect(gainSpan({ gained_since: '2026-10-13T01:00:00Z' }, 'month', now, 'America/Los_Angeles')).toBe('since Oct 12');
+  });
+});
+
+describe('signed', () => {
+  it('prefixes a sign and never shows +-', () => {
+    expect(signed('5')).toBe('+5');
+    expect(signed('-5')).toBe('\u22125');
+    expect(signed('0.0')).toBe('+0.0');
   });
 });

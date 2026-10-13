@@ -47,6 +47,12 @@ export default function PaperList({ sort, window, onShowAll }) {
 
   return (
     <section className="list" aria-busy={status === 'loading'}>
+      {papers.some((p) => p.rate_provisional) && (
+        // Phones show the rate (and its "est.") only under Trending.
+        <p className="list-status est-note" data-phone-hidden={sort !== 'trending' || undefined}>
+          est. = rate from less than 24 hours of star history so far
+        </p>
+      )}
       {papers.map((p) => (
         <PaperCard key={paperKey(p)} paper={p} sort={sort} window={window} />
       ))}

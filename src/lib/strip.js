@@ -1,3 +1,5 @@
+import { WINDOWS } from '../api';
+
 // Text for the card's metadata strip: arXiv category names and the honest
 // span behind a "stars gained" number.
 
@@ -69,19 +71,30 @@ const CATEGORIES = {
 export const categoryName = (code) => (code ? CATEGORIES[code] ?? code : code);
 
 const WINDOW_HOURS = { day: 24, week: 168, month: 720 };
-const WINDOW_LABEL = { day: '24H', week: '7D', month: '30D', all: 'All' };
 // Samples arrive every ~15 min; allow an hour before calling a span short.
 const SLACK_MS = 3600e3;
 
-// The span a "stars gained" number really covers: the window's label when
-// the star history spans the window, else "since <first sample date>".
-export function gainSpan(paper, window, now = Date.now()) {
-  const since = Date.parse(paper.gained_since ?? '');
-  if (Number.isNaN(since)) return WINDOW_LABEL[window];
-  const start = window in WINDOW_HOURS ? now - WINDOW_HOURS[window] * 3600e3 : -Infinity;
-  if (since <= start + SLACK_MS) return WINDOW_LABEL[window];
-  const d = new Date(since);
-  const opts = { month: 'short', day: 'numeric', timeZone: 'UTC' };
-  if (d.getUTCFullYear() !== new Date(now).getUTCFullYear()) opts.year = 'numeric';
-  return `since ${d.toLocaleDateString('en-US', opts)}`;
+// ISO or Postgres text ("2024-08-05 00:00:00+00"); NaN if neither.
+function parseTime(value) {
+  if (typeof value !== 'string') return NaN;
+  const iso = value.trim().replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
+  return Date.parse(iso);
 }
+
+// The span a "stars gained" number really covers: the window's label when
+// the star history spans the window, else "since <first sample date>" in
+// the reader's time zone.
+export function gainSpan(paper, window, now = Date.now(), timeZone = undefined) {
+  const label = WINDOWS.find((w) => w.value === window)?.label ?? '';
+  const since = parseTime(paper.gained_since);
+  if (Number.isNaN(since)) return label;
+  const start = window in WINDOW_HOURS ? now - WINDOW_HOURS[window] * 3600e3 : -Infinity;
+  if (since <= start + SLACK_MS) return label;
+  const year = (t) => new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone }).format(t);
+  const opts = { month: 'short', day: 'numeric', timeZone };
+  if (year(since) !== year(now)) opts.year = 'numeric';
+  return `since ${new Intl.DateTimeFormat('en-US', opts).format(since)}`;
+}
+
+// "+5", "−5" (minus sign), never "+-5". Takes an already formatted number.
+export const signed = (text) => (text.startsWith('-') ? `\u2212${text.slice(1)}` : `+${text}`);

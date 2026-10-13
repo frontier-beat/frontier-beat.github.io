@@ -212,9 +212,23 @@ a:hover {
 
 .strip-stats {
   display: flex;
-  flex: none;
-  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 16px;
   margin-left: auto;
+}
+
+.strip-stats > span {
+  white-space: nowrap;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .star {
@@ -360,13 +374,14 @@ a:hover {
   }
 
   .strip-stats > span:not([data-active]),
-  .date:not([data-active]) {
+  .date:not([data-active]),
+  .est-note[data-phone-hidden] {
     display: none; /* the published date shows when it is the sort (Newest) */
   }
 
   .category {
     flex: 0 1 auto;
-    min-width: 0;
+    min-width: 3em; /* a long stat may cut the name, never remove it */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

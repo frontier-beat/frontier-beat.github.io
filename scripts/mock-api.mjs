@@ -91,10 +91,16 @@ function topPapers(q) {
   const start = (page - 1) * perPage;
   const repos = list.slice(start, start + +perPage).map(({ gained, history, ...p }) => {
     const row = { ...p, stars_gained: gained[window] };
-    if (history < 2 / 3) {
-      const short = history < 1 / 3;
-      row.gained_since = new Date(short ? Date.now() - 2 * 3600e3 : Date.now() - 400 * 86400e3).toISOString();
-      row.rate_provisional = short;
+    // The card compares gained_since with the reader's clock, so these use
+    // real time: short rows have 2 h of history (and a matching small gain),
+    // full rows reach past every window.
+    if (history < 1 / 3) {
+      row.gained_since = new Date(Date.now() - 2 * 3600e3).toISOString();
+      row.rate_provisional = true;
+      row.stars_gained = Math.round(p.hourly_rate * 2);
+    } else if (history < 2 / 3) {
+      row.gained_since = new Date(Date.now() - 400 * 86400e3).toISOString();
+      row.rate_provisional = false;
     }
     return row;
   });

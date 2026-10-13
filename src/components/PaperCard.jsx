@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { FaStar } from 'react-icons/fa';
 import { Summary, Title } from './Markdown';
-import { categoryName, gainSpan } from '../lib/strip';
+import { categoryName, gainSpan, signed } from '../lib/strip';
 
 const fmt = new Intl.NumberFormat('en-US');
 const fmtRate = (r) => (r >= 100 ? fmt.format(Math.round(r)) : r.toFixed(1));
@@ -9,7 +9,8 @@ const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 // API fields go into href; allow only web links.
 const safeUrl = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null);
 const day = (iso) => (iso ? String(iso).slice(0, 10) : null);
-const Star = () => <FaStar className="star" aria-label="stars" />;
+// The icon replaces the word "stars"; screen readers get the word.
+const Star = () => <><FaStar className="star" aria-hidden="true" /><span className="sr-only"> stars</span></>;
 
 // Departure-board strip: category and date on the left; the numbers on the
 // right, with the one the list is sorted by in full contrast.
@@ -19,18 +20,18 @@ function Strip({ paper, sort, window }) {
       key: 'stars',
       body: <><Star /> {fmt.format(paper.star_count)}</>,
     },
-    isNum(paper.hourly_rate) && fmtRate(paper.hourly_rate) !== '0.0' && {
+    isNum(paper.hourly_rate) && !/^-?0\.0$/.test(fmtRate(paper.hourly_rate)) && {
       key: 'trending',
       body: (
         <>
-          +{fmtRate(paper.hourly_rate)} <Star />/h
+          {signed(fmtRate(paper.hourly_rate))} <Star />/h
           {paper.rate_provisional && <span className="est" title="Estimate: less than 24 hours of star history so far">est.</span>}
         </>
       ),
     },
     isNum(paper.stars_gained) && {
       key: 'gained',
-      body: <>+{fmt.format(paper.stars_gained)} <Star /> {gainSpan(paper, window)}</>,
+      body: <>{signed(fmt.format(paper.stars_gained))} <Star /> {gainSpan(paper, window)}</>,
     },
   ].filter(Boolean);
   return (
