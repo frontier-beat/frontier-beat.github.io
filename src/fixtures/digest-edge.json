@@ -1,0 +1,173 @@
+{
+  "arxiv_id": "edge.digest",
+  "title": "Edge cases for the paper digest renderer",
+  "primary_category": "cs.LG",
+  "digest": {
+    "version": 3,
+    "source_url": "https://arxiv.org/html/2610.00001v1",
+    "abstract": "We study sparse attention with cost $O(n \\log n)$ in the sequence length $n$, against $O(n^2)$ for dense attention. Training costs under \\$5 per run and about $3 per GPU-hour on rented hardware.\n\nOn five benchmarks the method matches dense attention within $0.4$ points while using $\\frac{1}{8}$ of the memory; the gap closes as $L \\to \\infty$.",
+    "sections": [
+      {
+        "id": "S1",
+        "heading": "Introduction",
+        "headline": "Dense attention gets too slow on long inputs, so the authors replace it with a sparse pattern that keeps most of the accuracy.",
+        "body": "Transformers compare every token with every other token, so cost grows with the square of the input length $n$. The authors keep a small set of **anchor tokens** that every token attends to, plus a local window.\n\n- The anchors carry global context.\n- The window carries local detail.\n\nTogether these give cost $O(n \\log n)$.",
+        "figure_ids": [
+          "S1.F1",
+          "S1.F2"
+        ]
+      },
+      {
+        "id": "S2",
+        "heading": "Method",
+        "headline": "Each token looks at a fixed local window plus a few learned anchor tokens.",
+        "body": "For a query $q_i$ the attention weights are\n\n$$a_{ij} = \\frac{\\exp(q_i^\\top k_j / \\sqrt{d})}{\\sum_{j' \\in \\mathcal{N}(i)} \\exp(q_i^\\top k_{j'} / \\sqrt{d})},$$\n\nwhere $\\mathcal{N}(i)$ is the window around $i$ joined with the anchor set $\\mathcal{A}$, with $|\\mathcal{A}| = 64$.",
+        "figure_ids": []
+      },
+      {
+        "id": "S3",
+        "heading": "Scaling to $10^6$ tokens",
+        "headline": "On five long-text benchmarks the sparse model scores within half a point of dense attention while using an eighth of the memory, and the result holds when the same comparison is repeated at four model sizes.",
+        "body": "Accuracy stays within $0.4$ points of the dense baseline on all five benchmarks. Memory falls to $\\frac{1}{8}$ at $n = 65{,}536$. The authors scale inputs to $10^6$ tokens, where dense attention runs out of memory.",
+        "figure_ids": [
+          "S3.F3",
+          "S3.F4",
+          "S3.F5"
+        ]
+      },
+      {
+        "id": "S4",
+        "heading": "Limitations",
+        "headline": "The anchors are fixed after training, so very different inputs may need new ones.",
+        "body": "The anchor set is learned once and then frozen. The authors did not test inputs from domains far from the training data.",
+        "figure_ids": [
+          "S4.F7"
+        ]
+      },
+      {
+        "id": "A",
+        "heading": "Appendix",
+        "headline": "The appendix gives the training settings and an ablation over the number of anchors.",
+        "body": "Training used a learning rate of $3 \\times 10^{-4}$ with cosine decay. Fewer than $16$ anchors lose about two points; more than $64$ give no gain.",
+        "figure_ids": [
+          "A1.F6"
+        ]
+      }
+    ],
+    "figures": [
+      {
+        "id": "S1.F1",
+        "label": "Figure 1",
+        "section_id": "S1",
+        "image_url": "https://arxiv.org/html/2610.00001v1/x1.png",
+        "image_kind": "raster",
+        "anchor_url": "https://arxiv.org/html/2610.00001v1#S1.F1",
+        "width": 1200,
+        "height": 600,
+        "caption": "Figure 1: Overview. Each token attends to a local window of size $w$ and to $|\\mathcal{A}|$ anchor tokens.",
+        "citing_sentences": [
+          "Figure 1 shows the attention pattern for one layer.",
+          "As in Figure 1, the window size $w$ is fixed per layer."
+        ],
+        "headline": "A diagram of the attention pattern, with a local window and a few global anchor tokens."
+      },
+      {
+        "id": "S1.F2",
+        "label": "Figure 2",
+        "section_id": "S1",
+        "image_url": "https://arxiv.org/html/2610.00001v1/overview_figure.svg",
+        "image_kind": "svg",
+        "anchor_url": "https://arxiv.org/html/2610.00001v1#S1.F2",
+        "caption": "Figure 2: Cost per token against input length. Left: dense. Right: sparse.",
+        "citing_sentences": [
+          "Figure 2 compares the cost of the two methods."
+        ],
+        "headline": "A plot showing that sparse attention cost grows far more slowly with input length.",
+        "images": [
+          {
+            "url": "https://arxiv.org/html/2610.00001v1/overview_figure.svg",
+            "kind": "svg",
+            "width": null,
+            "height": null
+          },
+          {
+            "url": "https://arxiv.org/html/2610.00001v1/x2b.png",
+            "kind": "raster",
+            "width": 600,
+            "height": 400
+          }
+        ]
+      },
+      {
+        "id": "S3.F3",
+        "label": "Figure 3",
+        "section_id": "S3",
+        "image_url": null,
+        "image_kind": "inline-svg",
+        "anchor_url": "https://arxiv.org/html/2610.00001v1#S3.F3",
+        "caption": "Figure 3: Accuracy on the five benchmarks (higher is better).",
+        "citing_sentences": [
+          "Figure 3 reports accuracy for both methods on every benchmark."
+        ],
+        "headline": "A bar chart of accuracy on five benchmarks for dense and sparse attention."
+      },
+      {
+        "id": "S3.F4",
+        "label": "Figure 4",
+        "section_id": "S3",
+        "image_url": "https://arxiv.org/html/2610.00001v1/x4.png",
+        "image_kind": "raster",
+        "anchor_url": "https://arxiv.org/html/2610.00001v1#S3.F4",
+        "width": 800,
+        "height": 1000,
+        "caption": "Figure 4: Memory use $M(n) = c_0 + c_1 n \\log n$ for $n \\in \\{2^{10}, 2^{12}, \\dots, 2^{20}\\}$, fitted with $\\hat{c}_1 = 1.7 \\times 10^{-3}$ (dashed) against the dense curve $M_{\\text{dense}}(n) = c_0 + c_2 n^2$ (solid); shaded bands are $\\pm 1\\sigma$ over $5$ seeds. Values above $80\\,\\text{GB}$ are out of memory on a single accelerator and are drawn as crosses. The run named sparse_attention_anchor64_window512_cosine_seed4 diverged and is omitted. Data and plotting code: https://example.org/a/very/long/path/that/must/wrap/inside/the/card/without/overflowing/at/375px.",
+        "citing_sentences": [
+          "Memory grows as $n \\log n$ (Figure 4), so a $10^6$-token input fits in $64\\,\\text{GB}$.",
+          "Figure 4 also shows the dense model failing beyond $n = 2^{16}$.",
+          "We fit $c_1$ by least squares on the points in Figure 4."
+        ],
+        "headline": "Memory use against input length, showing dense attention running out of memory long before the sparse version."
+      },
+      {
+        "id": "S3.F5",
+        "label": "Figure 5",
+        "section_id": "S3",
+        "image_url": "https://evil.example/tracker.png",
+        "image_kind": "raster",
+        "anchor_url": "https://arxiv.org/html/2610.00001v1#S3.F5",
+        "width": 400,
+        "height": 300,
+        "caption": "Figure 5: An image whose URL is outside the allowed origins; the card must not load it.",
+        "citing_sentences": [],
+        "headline": "A figure whose image must not load because it is hosted outside arXiv."
+      },
+      {
+        "id": "S4.F7",
+        "label": "Figure 6",
+        "section_id": "S4",
+        "image_url": null,
+        "image_kind": "none",
+        "images": [],
+        "anchor_url": "https://arxiv.org/html/2610.00001v1#S4.F7",
+        "caption": "Figure 6: A figure built from text boxes, with nothing to render as an image.",
+        "citing_sentences": [
+          "Figure 6 lists the failure cases."
+        ],
+        "headline": "A list of inputs where the fixed anchors fail."
+      },
+      {
+        "id": "A1.F6",
+        "label": "Figure 7",
+        "section_id": "A",
+        "image_url": "https://ar5iv.labs.arxiv.org/html/2610.00001/assets/x6.png",
+        "image_kind": "raster",
+        "anchor_url": "https://arxiv.org/html/2610.00001v1#A1.F6",
+        "width": 640,
+        "height": 480,
+        "caption": "Figure 7: Ablation over the anchor count $|\\mathcal{A}| \\in \\{4, 16, 64, 256\\}$.",
+        "citing_sentences": [],
+        "headline": "Accuracy for different numbers of anchors, flat above 64."
+      }
+    ]
+  }
+}

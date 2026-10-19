@@ -197,7 +197,7 @@ function balanceBraces(tex) {
 }
 
 // Fixes that never change valid KaTeX input, only make invalid input parse.
-function mathSafety(tex) {
+export function mathSafety(tex) {
   let t = tex.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&nbsp;/g, '~');
   t = t.replace(/\\(?:label|ref|eqref)\{[^{}]*\}/g, '');
   // Numbered environments are display-only in KaTeX; summaries never need numbers.

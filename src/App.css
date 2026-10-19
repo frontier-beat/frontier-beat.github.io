@@ -275,7 +275,8 @@ a:hover {
 
 /* Equations scroll inside the card; they never widen it. Inline math
    becomes a scroll box too, because a long \text{} run cannot wrap. */
-.summary .katex {
+.summary .katex,
+.digest .katex {
   display: inline-block;
   max-width: 100%;
   overflow-x: auto;
@@ -283,7 +284,8 @@ a:hover {
   vertical-align: middle;
 }
 
-.summary .katex-display > .katex {
+.summary .katex-display > .katex,
+.digest .katex-display > .katex {
   display: block;
   max-width: none;
   overflow: visible;
@@ -298,6 +300,168 @@ a:hover {
 
 .summary strong {
   font-weight: 600;
+}
+
+/* Digest: toggles as hairline-ruled rows. The closed rows read as the
+   summary; a plus/minus glyph replaces the browser's triangle. No motion. */
+.digest {
+  --marker: 1em;
+  --indent: calc(var(--marker) + 12px);
+  margin-bottom: 12px;
+  border-top: 1px solid var(--line);
+  overflow-wrap: break-word;
+}
+
+.digest > details {
+  border-bottom: 1px solid var(--line);
+}
+
+.digest summary {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 0;
+  list-style: none;
+  cursor: pointer;
+}
+
+.digest summary::-webkit-details-marker {
+  display: none;
+}
+
+.digest summary::before {
+  content: '+';
+  content: '+' / '';
+  flex: none;
+  width: var(--marker);
+  color: var(--muted);
+  font: var(--fs-body) / 1 ui-monospace, Menlo, Consolas, monospace;
+  text-align: center;
+}
+
+.digest details[open] > summary::before {
+  content: '\2212';
+  content: '\2212' / '';
+}
+
+.digest summary:hover .toggle-text {
+  text-decoration: underline;
+  text-decoration-color: var(--muted);
+}
+
+.toggle-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.digest-meta {
+  font-size: var(--fs-meta);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.digest-abstract .toggle-text {
+  color: var(--fg);
+}
+
+.figure-count {
+  flex: none;
+  white-space: nowrap;
+}
+
+.digest-body {
+  padding: 0 0 16px var(--indent);
+}
+
+.digest-body > p,
+.digest-body .summary p,
+.digest-body .summary ul,
+.digest-body .summary ol {
+  margin: 0 0 12px;
+}
+
+.digest-heading {
+  margin: 0 0 8px;
+}
+
+/* Math in a heading keeps its case and KaTeX's own spacing. */
+.digest-meta .katex {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.digest-error .button {
+  margin-left: 8px;
+}
+
+/* Figures: nested rows inside the section. */
+.figure {
+  border-top: 1px solid var(--line);
+}
+
+.figure > summary {
+  padding: 8px 0;
+}
+
+.figure-label {
+  font-weight: 600;
+}
+
+.figure-body {
+  margin: 0;
+  padding: 0 0 12px var(--indent);
+}
+
+/* Paper figures are drawn for white paper, so they keep a white mat in
+   both themes. SVGs scale up to 1.5x their size; rasters never upscale. */
+.figure-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 4px 0 12px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  object-fit: contain;
+}
+
+.figure-image[data-kind='svg'][width] {
+  width: min(100%, calc(var(--w) * 1.5px));
+}
+
+.figure-image[data-kind='svg']:not([width]) {
+  width: 100%;
+}
+
+.figure-missing {
+  margin: 4px 0 12px;
+  font-size: var(--fs-meta);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.figure-missing a {
+  color: var(--fg);
+  text-decoration: underline;
+}
+
+.figure-body figcaption {
+  margin-bottom: 12px;
+}
+
+.citing ul {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.citing li {
+  margin: 0 0 8px;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
 }
 
 .repo {
@@ -377,6 +541,23 @@ a:hover {
   .date:not([data-active]),
   .est-note[data-phone-hidden] {
     display: none; /* the published date shows when it is the sort (Newest) */
+  }
+
+  /* The figure count goes under the headline so the headline keeps the
+     full width. */
+  .digest summary {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  .figure-count {
+    flex-basis: 100%;
+    padding-left: var(--indent);
+  }
+
+  /* A figure inside a section uses the section's indent, not a second one. */
+  .figure-body {
+    padding-left: 0;
   }
 
   .category {

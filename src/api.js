@@ -24,13 +24,38 @@ export const PER_PAGE = 10;
 // (contracts.md); for `trending` and `gained` it limits the star samples.
 export const windowFiltersPublished = (sort) => sort === 'stars' || sort === 'new';
 
-export async function fetchPapers({ sort, window, page, signal }) {
-  const params = new URLSearchParams({ sort, window, page: String(page), per_page: String(PER_PAGE) });
-  const res = await fetch(`${API_BASE_URL}/top_papers?${params}`, { signal });
+async function getJson(url, signal) {
+  const res = await fetch(url, { signal });
   if (!res.ok) {
     let detail = '';
     try { detail = (await res.json()).error || ''; } catch { /* not JSON */ }
-    throw new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ''}`);
+    const err = new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ''}`);
+    err.status = res.status;
+    throw err;
   }
   return res.json();
+}
+
+export function fetchPapers({ sort, window, page, signal }) {
+  const params = new URLSearchParams({ sort, window, page: String(page), per_page: String(PER_PAGE) });
+  return getJson(`${API_BASE_URL}/top_papers?${params}`, signal);
+}
+
+// GET /papers/<id>/digest (digest-contract.md), once per paper per page
+// load: a card remounted by a ranking change reuses the response. A 404 is
+// remembered (digestMissing) so the card stays on its paragraph; other
+// failures are forgotten so Retry asks again.
+const digests = new Map();
+const missing = new Set();
+export const digestMissing = (arxivId) => missing.has(arxivId);
+export function fetchDigest(arxivId) {
+  if (!digests.has(arxivId)) {
+    const request = getJson(`${API_BASE_URL}/papers/${encodeURIComponent(arxivId)}/digest`);
+    request.catch((err) => {
+      if (err.status === 404) missing.add(arxivId);
+      else digests.delete(arxivId);
+    });
+    digests.set(arxivId, request);
+  }
+  return digests.get(arxivId);
 }

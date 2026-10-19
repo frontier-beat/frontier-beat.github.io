@@ -1,6 +1,8 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { FaStar } from 'react-icons/fa';
 import { Summary, Title } from './Markdown';
+import Digest, { hasDigest } from './Digest';
+import { digestMissing } from '../api';
 import { categoryName, gainSpan, signed } from '../lib/strip';
 
 const fmt = new Intl.NumberFormat('en-US');
@@ -50,6 +52,8 @@ function Strip({ paper, sort, window }) {
 function PaperCard({ paper, sort, window, ...rest }) {
   const paperUrl = safeUrl(paper.html_link);
   const repoUrl = safeUrl(paper.html_url);
+  // A digest that turns out to be missing (404) falls back to the paragraph.
+  const [missing, setMissing] = useState(() => digestMissing(paper.arxiv_id));
   return (
     <article className="card" {...rest}>
       <Strip paper={paper} sort={sort} window={window} />
@@ -58,7 +62,11 @@ function PaperCard({ paper, sort, window, ...rest }) {
           <a href={paperUrl} target="_blank" rel="noopener noreferrer"><Title text={paper.title} /></a>
         ) : <Title text={paper.title} />}
       </h2>
-      <Summary text={paper.paper_summary} version={paper.summary_version ?? 1} />
+      {hasDigest(paper) && !missing ? (
+        <Digest paper={paper} onMissing={() => setMissing(true)} />
+      ) : (
+        <Summary text={paper.paper_summary} version={paper.summary_version ?? 1} />
+      )}
       {repoUrl && (
         <a className="repo" href={repoUrl} target="_blank" rel="noopener noreferrer">
           <span className="repo-label">GitHub</span>

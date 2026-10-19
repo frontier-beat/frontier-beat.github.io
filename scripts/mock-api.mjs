@@ -5,8 +5,12 @@
 //   PORT=9000 MOCK_DELAY=800 node scripts/mock-api.mjs
 //   MOCK_FAIL=1   -> every /top_papers call returns 500 (error state)
 //   MOCK_EDGE=1   -> also serve src/fixtures/edge-cases.json rows as v2 papers
+//
+// Papers with a digest (src/fixtures/*digest*.json) lead every ranking and
+// carry has_digest + digest_headlines; GET /papers/<id>/digest serves them.
 import { createServer } from 'node:http';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { unwrapDigestFixture } from '../src/lib/digest.js';
 
 const PORT = Number(process.env.PORT || 8787);
 const DELAY = Number(process.env.MOCK_DELAY || 0);
@@ -38,10 +42,32 @@ if (process.env.MOCK_EDGE) {
 const toIso = (d) => new Date(d.replace(' ', 'T').replace(/\+00$/, 'Z')).toISOString();
 const NOW = Math.max(...rows.map((r) => Date.parse(toIso(r.published_date))));
 
+const DIGESTS = new Map();
+const digestRows = [];
+for (const file of readdirSync(new URL('../src/fixtures/', import.meta.url)).filter((f) => /digest.*\.json$/.test(f)).sort()) {
+  const data = load(`../src/fixtures/${file}`);
+  const meta = unwrapDigestFixture(data, file);
+  const { digest } = meta;
+  DIGESTS.set(meta.arxiv_id, digest);
+  digestRows.push({
+    arxiv_id: meta.arxiv_id,
+    title: meta.title ?? `arXiv ${meta.arxiv_id}`,
+    paper_summary: meta.paper_summary ?? 'Fallback v2 paragraph for a paper whose digest is missing.',
+    summary_version: 2,
+    primary_category: meta.primary_category ?? 'cs.LG',
+    published_date: new Date(NOW).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '+00'),
+    html_link: digest.source_url ?? `https://arxiv.org/abs/${meta.arxiv_id}`,
+    has_digest: true,
+    digest_headlines: digest.sections.map((s) => ({ id: s.id, heading: s.heading, headline: s.headline, figure_count: (s.figure_ids ?? []).length })),
+  });
+}
+rows.unshift(...digestRows);
+
 const papers = rows.map((r) => {
   const rnd = rand(r.arxiv_id);
   const stars = Math.floor(20 + rnd() ** 3 * 40000);
-  const rate = Number((rnd() ** 2 * 12).toFixed(2));
+  // Digest papers rank first under every sort.
+  const rate = r.has_digest ? 50 - digestRows.indexOf(r) : Number((rnd() ** 2 * 12).toFixed(2));
   const slug = r.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').split('-').slice(0, 4).join('-') || 'repo';
   return {
     arxiv_id: r.arxiv_id,
@@ -57,6 +83,8 @@ const papers = rows.map((r) => {
     published_date: toIso(r.published_date),
     primary_category: r.primary_category,
     summary_version: r.summary_version,
+    has_digest: Boolean(r.has_digest),
+    digest_headlines: r.digest_headlines ?? null,
     // Optional fields (contracts.md 18:20Z): a third of rows have only two
     // hours of history, a third a full history, a third omit the fields.
     history: rnd(),
@@ -79,8 +107,8 @@ function topPapers(q) {
   if (sort === 'new' || sort === 'stars') list = list.filter((p) => Date.parse(p.published_date) >= cutoff);
   const key = {
     trending: (p) => [p.hourly_rate, p.star_count],
-    stars: (p) => [p.star_count, 0],
-    gained: (p) => [p.gained[window], p.star_count],
+    stars: (p) => [p.has_digest ? Infinity : p.star_count, 0],
+    gained: (p) => [p.has_digest ? Infinity : p.gained[window], p.star_count],
     new: (p) => [Date.parse(p.published_date), 0],
   }[sort];
   list = [...list].sort((a, b) => {
@@ -119,6 +147,11 @@ createServer((req, res) => {
   if (req.method === 'OPTIONS') return res.writeHead(204).end();
   if (req.method !== 'GET') return send([405, { error: 'GET only' }]);
   if (url.pathname === '/health') return send([200, { status: 'ok', papers: papers.length, last_job_run: { name: 'mock', finished_at: new Date(NOW).toISOString(), status: 'succeeded' } }]);
+  const digestPath = url.pathname.match(/^\/papers\/([^/]+)\/digest$/);
+  if (digestPath) {
+    const digest = DIGESTS.get(decodeURIComponent(digestPath[1]));
+    return send(digest ? [200, digest] : [404, { error: 'no digest' }]);
+  }
   if (url.pathname === '/top_papers') return send(process.env.MOCK_FAIL ? [500, { error: 'mock failure' }] : topPapers(url.searchParams));
   return send([404, { error: 'not found' }]);
 }).listen(PORT, () => console.log(`mock API on http://localhost:${PORT} (${papers.length} papers)`));

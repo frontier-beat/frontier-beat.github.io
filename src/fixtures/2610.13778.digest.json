@@ -1,0 +1,318 @@
+{
+  "arxiv_id": "2610.13778",
+  "title": "ReplaySSM: Cache SSM Inputs, Not State",
+  "primary_category": "cs.LG",
+  "placeholder": false,
+  "digest": {
+    "version": 3,
+    "source_url": "https://arxiv.org/html/2610.13778",
+    "abstract": "State-space models (SSMs) maintain a fixed-size recurrent state, but reading and writing it at every decoding step can bottleneck hybrid models. This eager state management causes large state I/O with low arithmetic intensity, leaves speculative decoding no cheap rollback, and feeds state quantization error into subsequent recurrent updates. We introduce ReplaySSM, which unrolls the recurrence to represent the state as a checkpoint and a buffer of recent SSM inputs. This separates output computation from checkpoint updates. By updating the checkpoint periodically, ReplaySSM avoids state writes on most steps and roughly halves the dominant state memory traffic. Keeping recent inputs also makes speculative rollback a buffer-pointer operation and enables output-only verification without materializing intermediate states. The same separation allows a low-precision checkpoint to serve output computation on most steps while a higher-precision checkpoint serves recurrent updates, so rounding error in the low-precision copy never enters later updates. We implement ReplaySSM in vLLM for Mamba-2 and Gated DeltaNet. At serving batch size 256, it accelerates standard decoding by $1.20$–$1.47\\times$ over a tuned vLLM baseline across four hybrid models, and delivers about $1.8\\times$ the throughput of vLLM’s speculative decoding on the two 120B-class models. Separate state precisions also reduce output KL divergence and downstream accuracy losses compared with a shared low-precision checkpoint.\n\nCode: https://github.com/Johnny-Liou/ReplaySSM.",
+    "sections": [
+      {
+        "id": "S1",
+        "heading": "Introduction",
+        "headline": "Reading and writing the recurrent state at every decoding step slows hybrid models, blocks cheap rollback and spreads quantization error.",
+        "body": "Long reasoning and agent workloads make decoding expensive. Attention keeps a key-value cache that grows with sequence length; state-space models such as Mamba-2 and Gated DeltaNet keep a fixed-size state instead, and production hybrids interleave both. The fixed state is still costly: each step loads the full state, applies a decay and a rank-1 update, and stores it back, so the update is memory-bound and can dominate latency up to 100K tokens at serving batch sizes. The update has no cheap inverse, which forces speculative decoding to snapshot the state per draft token, and rounding error from a quantized state re-enters every later update. ReplaySSM represents the state as a checkpoint plus a buffer of recent inputs to separate output computation from checkpoint updates.",
+        "figure_ids": [
+          "S1.F1"
+        ]
+      },
+      {
+        "id": "S2",
+        "heading": "Preliminaries",
+        "headline": "Mamba-2 and Gated DeltaNet update a fixed-size state with a decay and a rank-1 write; speculative decoding and quantization add rollback and rounding problems.",
+        "body": "In Mamba-2 the state $S_t$ is updated as $S_t = \\alpha_t S_{t-1} + v_t k_t^{\\top}$, the output is the state applied to the query, and $\\alpha_t$ is a data-dependent scalar decay; each step loads the state from memory, forms the new state and output, and stores the state back. Delta-rule models such as Gated DeltaNet first remove old information before writing, which can be rewritten in the same outer-product form with a correction term computed from the previous state. Speculative decoding verifies several draft tokens in one pass and must keep only the accepted prefix. Quantization cuts storage and traffic; round-to-nearest adds systematic bias while stochastic rounding is unbiased but noisy.",
+        "figure_ids": []
+      },
+      {
+        "id": "S3",
+        "heading": "Motivation and Key Insight",
+        "headline": "The state update is memory-bound, cannot roll back cheaply and feeds rounding error forward, so ReplaySSM keeps a checkpoint plus recent inputs.",
+        "body": "Three problems follow from updating the state eagerly at every step. First, the update moves the whole state for little arithmetic: on Nemotron-3-Super-120B-A12B at batch size 256 on one B300, state updates stay the largest latency component up to 100K tokens, because the model has five times as many SSM layers as attention layers and each FP32 state is 4 MiB per sequence. Second, an updated state has no cheap inverse, so serving systems store a snapshot per draft token for speculative decoding. Third, a quantized state feeds its rounding error into every later update. ReplaySSM instead keeps a checkpoint and a bounded buffer of recent inputs, computes outputs from both, and folds the buffer into the checkpoint only on flush steps.",
+        "figure_ids": []
+      },
+      {
+        "id": "S4",
+        "heading": "ReplaySSM for Standard Decoding",
+        "headline": "Replaying buffered inputs onto the checkpoint lets most steps skip the state write, roughly halving state memory traffic with a window of 16 steps.",
+        "body": "The replay operation reconstructs the current state from the checkpoint and the buffered inputs by applying the cumulative decays and summing the buffered rank-1 terms. Each step appends its inputs, replays, and computes the output; only the flush branch stores a full state. Over a window of $L$ steps both methods read the full state $L$ times, but conventional decoding writes it $L$ times while ReplaySSM writes it once plus the small buffer traffic, so the dominant state traffic roughly halves. A larger window amortizes each checkpoint write over more steps but makes each step load and apply more buffered inputs; the paper uses $L = 16$ throughout. Gated DeltaNet stores the correction term in place of the value in each buffered record.",
+        "figure_ids": []
+      },
+      {
+        "id": "S5",
+        "heading": "ReplaySSM for Speculative Decoding",
+        "headline": "Buffered draft inputs make rollback a pointer move and let the target model verify drafts from outputs alone without materializing intermediate states.",
+        "body": "During verification the inputs of all $T$ draft tokens are appended to the buffer first; after the target model reports how many were accepted, the buffer pointer advances by that number and rejected records are simply overwritten later. Flushes fold only committed inputs into the checkpoint, so they can run before acceptance is known. The buffer is a ring with room for $L$ committed records and $T$ drafts, and it flushes whenever the committed length would exceed $L$, so flush frequency now depends on acceptance. Verification itself is output-only: outputs for every draft position are computed directly from the checkpoint and the buffered inputs, which needs fewer floating-point operations and shares the key-query product across value heads. Gated DeltaNet obtains all draft corrections from one small triangular solve.",
+        "figure_ids": [
+          "S5.T1.fig2"
+        ]
+      },
+      {
+        "id": "S6",
+        "heading": "ReplaySSM for Low-Precision State",
+        "headline": "A high-precision checkpoint carries the recurrence while a low-precision copy serves output computation, so rounding error in the copy never accumulates.",
+        "body": "Lower-precision state storage cuts memory traffic, but in conventional decoding the same stored state computes outputs and feeds the next update, so its rounding error re-enters the recurrence every step. ReplaySSM already quantizes once per window rather than once per step, and because non-flush steps only read the state for outputs, the two roles can use different precisions. A high-precision checkpoint is read on flush steps to reconstruct the committed state, which is then cast independently into both a high-precision and a low-precision copy; non-flush steps read only the small copy. The low-precision copy is never read back into the recurrence, so its error does not accumulate, though each non-flush output still depends on it. Gated DeltaNet additionally recomputes its corrections from the high-precision state at flush time.",
+        "figure_ids": [
+          "S6.F4.fig1",
+          "S6.F4.fig2"
+        ]
+      },
+      {
+        "id": "S7",
+        "heading": "Evaluation",
+        "headline": "In vLLM at batch size 256, ReplaySSM speeds standard decoding 1.20 to 1.47 times, raises speculative throughput, and cuts low-precision output error.",
+        "body": "Four hybrid models are evaluated on one GPU each: Nemotron-3 (Mamba-2) and Qwen3.5 (Gated DeltaNet) at 4B and 120B-class sizes, against tuned conventional vLLM decoding with CUDA graphs and FP32 state. At batch size 256 with a window of 16, the SSM kernel runs 1.46 to 1.80 times faster and the whole decode step 1.20 to 1.47 times faster; at batch size 1 the kernel is latency-bound and the gain is within a few percent. Speculative decoding is measured as serving throughput and verification kernel latency. Low-precision experiments measure KL divergence from FP32-state decoding on PG-19 up to 128K tokens and accuracy on MMLU-Pro, GPQA-Diamond and Math-L5; accuracy losses concentrate in long generations, where separate precisions keep gaps to 2.0 and 3.4 points against 20.9 and 28.2 for a shared NVFP4 checkpoint.",
+        "figure_ids": [
+          "S7.F6.fig1",
+          "S7.F6.fig2"
+        ]
+      },
+      {
+        "id": "S8",
+        "heading": "Related Work",
+        "headline": "Chunkwise SSM kernels, prefix caching, speculative-decoding state snapshots and state quantization each address part of the problem; ReplaySSM targets decoding traffic and composes with them.",
+        "body": "Mamba, Mamba-2, Gated DeltaNet and Kimi Delta Attention organize training and prefill around chunkwise matrix multiplications; ReplaySSM targets memory-bound decoding instead and can reuse those chunkwise kernels with the buffered inputs as the chunk. Marconi adds prefix caching for hybrid models, which saves prefill work and can be combined with the decoding savings here. For speculative decoding, vLLM stores a state snapshot per verified token, costing one read and $T$ writes per step, and earlier methods recover the state in other ways that the appendix compares. State quantization work such as Q-Mamba keeps one quantized state that both produces outputs and feeds the next update, so rounding error still enters the recurrence; separate precisions remove that term while the read error remains.",
+        "figure_ids": []
+      },
+      {
+        "id": "S9",
+        "heading": "Conclusion and Future Work",
+        "headline": "ReplaySSM is adopted in production models and LLM serving systems; the remaining cost is the per-step checkpoint read, which decayed heads could skip.",
+        "body": "ReplaySSM unrolls the recurrence into a checkpoint plus a buffer of recent inputs, so most steps compute outputs and write no state, and the checkpoint is written once per window. This roughly halves the dominant state traffic, turns speculative rollback into a buffer-pointer move with output-only verification, and keeps a low-precision read checkpoint out of the recurrence. In vLLM at serving batch sizes it speeds standard decoding by 1.20 to 1.47 times, gives about 1.8 times the throughput of vLLM's speculative decoding on two 120B-class models, and separate precisions reduce the output KL of an NVFP4 checkpoint by 13 to 36 times at the longest measured generation length. Every step still reads the checkpoint; heads whose decay has become negligible could skip that read on non-flush steps.",
+        "figure_ids": []
+      },
+      {
+        "id": "A",
+        "heading": "Appendix",
+        "headline": "Appendices compare verification cost with four prior methods, derive traffic and FLOP counts, give the Gated DeltaNet forms, and sweep batch size, window and precision.",
+        "body": "Appendix A times one verification step of ReplaySSM against vLLM's per-token snapshots, The Mamba in the Llama, two Snakes and Ladders variants and STree, all tuned, on one B300 at the Mamba-2 layer shape of Nemotron-3-Super-120B-A12B with 256 requests, where one state is 4.2 MB. Later appendices give the Gated DeltaNet replay, verification and precision forms, count state traffic and floating-point operations, describe the vLLM implementation, and report sweeps: batch size from 1 to 512, replay windows of 8 to 64 where 16 is best, speculative kernel latency on the Qwen model, non-flush speedup by read precision, output KL for all models and windows, accuracy by generation-length quartile, a direction for skipping checkpoint reads in decayed heads, and adoption in GLM-5.3-Flash, Kimi-K3, TensorRT-LLM, vLLM, SGLang and FlashInfer.",
+        "figure_ids": [
+          "A1.F7",
+          "A5.F8",
+          "A5.F9",
+          "A5.F10",
+          "A5.F11",
+          "A5.F12",
+          "A5.F13",
+          "A5.F14"
+        ]
+      }
+    ],
+    "figures": [
+      {
+        "id": "S1.F1",
+        "label": "Figure 1",
+        "section_id": "S1",
+        "image_url": "https://arxiv.org/html/2610.13778v1/overview_figure.svg",
+        "image_kind": "svg",
+        "anchor_url": "https://arxiv.org/html/2610.13778#S1.F1",
+        "width": 537,
+        "height": 354,
+        "caption": "ReplaySSM overview. Top: conventional decoding loads and stores the full state at every step. ReplaySSM unrolls the recurrence to separate output computation from checkpoint updates: it caches recent SSM inputs and folds them into the checkpoint periodically, avoiding full-state writes on most steps. Bottom: three challenges of conventional decoding, and how ReplaySSM addresses each. (1) SSM layers can bottleneck hybrid models up to 100K tokens (Nemotron-3-Super-120B-A12B-NVFP4, batch size 256, one B300); ReplaySSM roughly halves their state traffic. (2) State rollback, expensive to support in conventional speculative decoding, becomes a buffer-pointer move. (3) A low-precision checkpoint serves outputs while a high-precision one carries the recurrence, so rounding error no longer re-enters the recurrence.",
+        "citing_sentences": [
+          "At serving batch sizes, this state traffic can make SSM updates the bottleneck up to 100K tokens even in hybrid models whose attention cost grows with output context length (Figure 1, bottom left).",
+          "ReplaySSM therefore represents the state as a checkpoint and a bounded buffer of recent SSM inputs (Figure 1, top).",
+          "However, directly and eagerly following the recurrence, materializing the updated state at every decoding step, creates three challenges (Figure 1, bottom): low arithmetic intensity, expensive rollback, and propagation of quantization error through the recurrence."
+        ],
+        "headline": "Conventional decoding loads and stores the full state every step, while ReplaySSM caches recent inputs and folds them into the checkpoint periodically."
+      },
+      {
+        "id": "S5.T1.fig2",
+        "label": "Figure 2",
+        "section_id": "S5",
+        "image_url": "https://arxiv.org/html/2610.13778v1/standard_decoding_speedup.svg",
+        "image_kind": "svg",
+        "anchor_url": "https://arxiv.org/html/2610.13778#S5.T1.fig2",
+        "width": 265,
+        "height": 167,
+        "caption": "Standard-decoding speedup over tuned conventional vLLM ($B=256$, $L=16$, FP32 state). Kernel numbers include flush costs.",
+        "citing_sentences": [
+          "At $B=256$ and $L=16$, ReplaySSM speeds up the SSM kernel by $1.46$–$1.80\\times$ and the whole decode step by $1.20$–$1.47\\times$ across the four models (Figure 1)."
+        ],
+        "headline": "At batch size 256 and window 16, the SSM kernel and the whole decode step both run faster than tuned vLLM on all four models."
+      },
+      {
+        "id": "S6.F4.fig1",
+        "label": "Figure 3",
+        "section_id": "S6",
+        "image_url": "https://arxiv.org/html/2610.13778v1/speculative_serving_throughput.svg",
+        "image_kind": "svg",
+        "anchor_url": "https://arxiv.org/html/2610.13778#S6.F4.fig1",
+        "width": 265,
+        "height": 231,
+        "caption": "Speculative serving throughput ($L=16$, $T=4$, FP32 state, one B300 per model).",
+        "citing_sentences": [],
+        "headline": "Speculative serving throughput on one B300 per model, with a window of 16 and four tokens verified per step."
+      },
+      {
+        "id": "S6.F4.fig2",
+        "label": "Figure 4",
+        "section_id": "S6",
+        "image_url": "https://arxiv.org/html/2610.13778v1/speculative_kernel_latency_mamba2.svg",
+        "image_kind": "svg",
+        "anchor_url": "https://arxiv.org/html/2610.13778#S6.F4.fig2",
+        "width": 265,
+        "height": 231,
+        "caption": "Speculative kernel latency ($B=256$, $L=16$, FP32 state), flushes included.",
+        "citing_sentences": [
+          "Figure 4 compares serving throughput with conventional vLLM standard and speculative decoding.",
+          "Figure 4 shows its cost on Nemotron-3-Super-120B-A12B at $B=256$.",
+          "This overhead means that speculative decoding, a reliable speedup for Transformers, barely helps SSMs at serving batch sizes (Figure 4), creating a major disadvantage."
+        ],
+        "headline": "Speculative kernel latency at batch size 256 with flushes included, compared with conventional vLLM standard and speculative decoding."
+      },
+      {
+        "id": "S7.F6.fig1",
+        "label": "Figure 5",
+        "section_id": "S7",
+        "image_url": "https://arxiv.org/html/2610.13778v1/precision_kl_small_models.svg",
+        "image_kind": "svg",
+        "anchor_url": "https://arxiv.org/html/2610.13778#S7.F6.fig1",
+        "width": 294,
+        "height": 220,
+        "caption": "Output KL from conventional FP32-state decoding under teacher forcing on PG-19.",
+        "citing_sentences": [],
+        "headline": "Output KL divergence from FP32-state decoding on long book text grows with generation length for shared low-precision checkpoints but stays low with separate precisions."
+      },
+      {
+        "id": "S7.F6.fig2",
+        "label": "Figure 6",
+        "section_id": "S7",
+        "image_url": "https://arxiv.org/html/2610.13778v1/precision_gpqa_by_length_nemotron_super.svg",
+        "image_kind": "svg",
+        "anchor_url": "https://arxiv.org/html/2610.13778#S7.F6.fig2",
+        "width": 235,
+        "height": 219,
+        "caption": "GPQA-Diamond accuracy by FP32 reference-length quartile.",
+        "citing_sentences": [
+          "Figure 6 shows the output KL from FP32-state decoding on Qwen3.5-4B.",
+          "There, the gap between shared NVFP4+SR and FP32 grows from 0–2 points in the two shorter quartiles to 20.9 and 28.2 points in the two longer ones, while NVFP4 reads with FP8+SR recurrence keep the latter gaps at 2.0 and 3.4 points (Figure 6).",
+          "Figure 12 shows the three models not in Figure 6, and three points hold across all four."
+        ],
+        "headline": "On GPQA-Diamond the accuracy gap to FP32 grows in the longest reference-length quartiles for a shared NVFP4 checkpoint but stays small with separate precisions."
+      },
+      {
+        "id": "A1.F7",
+        "label": "Figure 7",
+        "section_id": "A",
+        "image_url": "https://arxiv.org/html/2610.13778v1/speculative_kernel_latency_prior_methods.svg",
+        "image_kind": "svg",
+        "anchor_url": "https://arxiv.org/html/2610.13778#A1.F7",
+        "width": 548,
+        "height": 219,
+        "caption": "Per-step speculative kernel latency against prior methods on Nemotron-3-Super-120B-A12B (Mamba-2; $B=256$, $L=16$, FP32 state, one B300), normalized to conventional standard decoding ($T=1$). STree is measured as its algorithm, replay plus read-only tree scan without the released path’s two state copies, and every kernel runs at its best swept launch configuration. STree does not depend on acceptance. Each band starts at the all-rejected cost ($a=1$) and ends at the most expensive outcome, $a=T$ for ReplaySSM, whose bars include flushes, and $a=T-1$ for The Mamba in the Llama, whose replay is skipped when every draft is accepted.",
+        "citing_sentences": [
+          "Figure 7 adds STree and The Mamba in the Llama to Figure 4."
+        ],
+        "headline": "Per-step speculative kernel latency of ReplaySSM against STree, The Mamba in the Llama and vLLM snapshots on Nemotron-3-Super-120B-A12B, normalized to standard decoding."
+      },
+      {
+        "id": "A5.F8",
+        "label": "Figure 8",
+        "section_id": "A",
+        "image_url": "https://arxiv.org/html/2610.13778v1/standard_decoding_batch_sweep.svg",
+        "image_kind": "svg",
+        "anchor_url": "https://arxiv.org/html/2610.13778#A5.F8",
+        "width": 548,
+        "height": 229,
+        "caption": "Standard decoding across batch size on Nemotron-3-Nano-4B ($L=16$, FP32 state, one H100). Left: DRAM bandwidth of the conventional kernel as a fraction of peak. Middle and right: isolated kernel and end-to-end per-step speedup over tuned conventional vLLM.",
+        "citing_sentences": [
+          "Figure 8 sweeps the batch size on Nemotron-3-Nano-4B, and Tables 7 and 7 give the end-to-end and kernel speedups for all four models."
+        ],
+        "headline": "Across batch sizes on Nemotron-3-Nano-4B, the kernel and end-to-end speedup grow once the conventional kernel becomes bandwidth-bound."
+      },
+      {
+        "id": "A5.F9",
+        "label": "Figure 9",
+        "section_id": "A",
+        "image_url": "https://arxiv.org/html/2610.13778v1/standard_decoding_window_sweep.svg",
+        "image_kind": "svg",
+        "anchor_url": "https://arxiv.org/html/2610.13778#A5.F9",
+        "width": 548,
+        "height": 250,
+        "caption": "Amortized kernel speedup over tuned conventional vLLM across replay-window sizes, amortized over one replay cycle ($B=256$, FP32 state). $L=16$ is best in all four settings. The vertical axis starts at $0.5$.",
+        "citing_sentences": [
+          "Figure 9 sweeps $L\\in\\{8,16,32\\}$ at $B=256$."
+        ],
+        "headline": "Amortized kernel speedup across replay-window sizes at batch size 256, where a window of 16 is best in all four settings."
+      },
+      {
+        "id": "A5.F10",
+        "label": "Figure 10",
+        "section_id": "A",
+        "image_url": "https://arxiv.org/html/2610.13778v1/speculative_kernel_latency_gdn.svg",
+        "image_kind": "svg",
+        "anchor_url": "https://arxiv.org/html/2610.13778#A5.F10",
+        "width": 548,
+        "height": 218,
+        "caption": "Speculative kernel latency on Qwen3.5-122B-A10B (GDN; $B=256$, $L=16$, FP32 state), normalized to conventional standard decoding ($T=1$). ReplaySSM bands span all drafts rejected to all drafts accepted and include flush costs.",
+        "citing_sentences": [
+          "This is the band in Figures 4 and 10.",
+          "Figure 10 repeats Figure 4 for Qwen3.5-122B-A10B."
+        ],
+        "headline": "Speculative kernel latency on Qwen3.5-122B-A10B at batch size 256, with bands spanning all drafts rejected to all drafts accepted."
+      },
+      {
+        "id": "A5.F11",
+        "label": "Figure 11",
+        "section_id": "A",
+        "image_url": "https://arxiv.org/html/2610.13778v1/precision_nonflush_kernel_speedup.svg",
+        "image_kind": "svg",
+        "anchor_url": "https://arxiv.org/html/2610.13778#A5.F11",
+        "width": 548,
+        "height": 228,
+        "caption": "Non-flush kernel speedup over an FP32 state by read-checkpoint precision ($B=256$, $L=16$, one B300).",
+        "citing_sentences": [
+          "A lower-precision read checkpoint also moves fewer bytes on every non-flush step, so it can lower latency as well, and Figure 11 quantifies that gain."
+        ],
+        "headline": "Non-flush kernel speedup over an FP32 state grows as the read checkpoint precision drops, at batch size 256 on one B300."
+      },
+      {
+        "id": "A5.F12",
+        "label": "Figure 12",
+        "section_id": "A",
+        "image_url": "https://arxiv.org/html/2610.13778v1/precision_kl_by_model.svg",
+        "image_kind": "svg",
+        "anchor_url": "https://arxiv.org/html/2610.13778#A5.F12",
+        "width": 548,
+        "height": 307,
+        "caption": "Output KL from conventional FP32-state decoding under teacher forcing on PG-19 ($L=16$), the three models outside Figure 6, on one shared vertical axis. Nemotron-3-Nano-4B stops at 32K (see text). Arrows mark the gap between a shared NVFP4 checkpoint and NVFP4 reads with FP32 recurrence at the last plotted $N$.",
+        "citing_sentences": [
+          "Figure 12 shows the three models not in Figure 6, and three points hold across all four.",
+          "At the last plotted $N$, NVFP4 reads with FP32 recurrence sit $13$–$29\\times$ below a shared NVFP4 checkpoint (arrows in Figure 12), and FP16+SR recurrence tracks FP32 recurrence within $1.25\\times$ at every point but one."
+        ],
+        "headline": "Output KL for the three models outside Figure 6 shows the same gap between a shared NVFP4 checkpoint and NVFP4 reads with higher-precision recurrence."
+      },
+      {
+        "id": "A5.F13",
+        "label": "Figure 13",
+        "section_id": "A",
+        "image_url": "https://arxiv.org/html/2610.13778v1/precision_kl_window_sweep.svg",
+        "image_kind": "svg",
+        "anchor_url": "https://arxiv.org/html/2610.13778#A5.F13",
+        "width": 548,
+        "height": 244,
+        "caption": "Output KL across replay-window sizes on Qwen3.5-4B. $L=1$ requantizes the state at every step, as conventional decoding does, and exists only for a shared checkpoint. Separate configurations use FP32 recurrence. The grey band is the FP32-state ReplaySSM floor over $L=1$–$64$.",
+        "citing_sentences": [
+          "Figure 13 repeats the KL measurement on Qwen3.5-4B at $L\\in\\{1,4,16,32,64\\}$ for two shared and two separate configurations; the separate ones use FP32 recurrence here."
+        ],
+        "headline": "Output KL on Qwen3.5-4B across replay windows, where a shared checkpoint degrades with the window while separate configurations stay near the FP32 floor."
+      },
+      {
+        "id": "A5.F14",
+        "label": "Figure 14",
+        "section_id": "A",
+        "image_url": "https://arxiv.org/html/2610.13778v1/precision_accuracy_by_length.svg",
+        "image_kind": "svg",
+        "anchor_url": "https://arxiv.org/html/2610.13778#A5.F14",
+        "width": 548,
+        "height": 458,
+        "caption": "Accuracy by quartile of FP32 reference generation length, all models and benchmarks. Bins are defined by the FP32 run. Within each benchmark row the three larger models share one vertical range; the Math-L5 row starts at 50%.",
+        "citing_sentences": [
+          "Figure 14 therefore extends Figure 6 to all four models and three benchmarks and plots accuracy against generation length for the FP32 reference, the shared NVFP4+SR checkpoint, and NVFP4 reads with FP8+SR recurrence."
+        ],
+        "headline": "Accuracy by reference generation-length quartile for all models and benchmarks, with losses concentrated in the longest generations for shared NVFP4."
+      }
+    ]
+  }
+}

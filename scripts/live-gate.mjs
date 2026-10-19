@@ -9,6 +9,9 @@
 // left in prose, split by summary_version; overflowing cards; console
 // errors. Then every v2 summary seen goes through normalizeSummary(text, 2)
 // in Node: a valid v2 string must come back unchanged (no v1 side effects).
+// Digest cards: every toggle on the first page is opened (abstract,
+// sections, then figures) and the same counts are taken with everything
+// open, plus image requests (all must be arXiv) and images that failed.
 import { chromium } from '@playwright/test';
 import { normalizeSummary } from '../src/lib/normalize.js';
 
@@ -16,6 +19,11 @@ const BASE = (process.argv[2] || 'https://frontier-beat.github.io').replace(/\/$
 const CARDS = Number(process.argv[3] || 50);
 const VIEWS = [['new', 'all'], ['trending', 'all'], ['trending', 'month']];
 const WIDTHS = [375, 1280];
+
+const PAGE = 10; // cards on the first page
+// A TeX command name, or a $ that is not currency, left in visible text.
+const RAW_TEX = /\\[A-Za-z]{2,}|\$(?!\d)/g;
+const ARXIV_IMAGE = /^https:\/\/(arxiv\.org|ar5iv\.labs\.arxiv\.org)\//;
 
 const browser = await chromium.launch({ headless: true });
 const papers = new Map(); // html_link -> API row
@@ -39,17 +47,17 @@ for (const width of WIDTHS) {
       await page.waitForTimeout(400);
       if (await page.getByText(/End of list/).count()) break;
     }
-    const cards = await page.locator('.card').evaluateAll((els, n) => els.slice(0, n).map((card) => {
+    const cards = await page.locator('.card').evaluateAll((els, [n, re]) => els.slice(0, n).map((card) => {
       const clone = card.cloneNode(true);
       clone.querySelectorAll('.katex, .sr-only, code').forEach((k) => k.remove());
       return {
         link: card.querySelector('.card-title a')?.getAttribute('href') ?? null,
         errors: card.querySelectorAll('.katex-error, .katex [style*="color:#cc0000"], .katex [style*="color: rgb(204, 0, 0)"]').length,
         katex: card.querySelectorAll('.katex').length,
-        rawTex: (clone.textContent.match(/\\[A-Za-z]{2,}|\$/g) || []).slice(0, 4),
+        rawTex: (clone.textContent.match(new RegExp(re, 'g')) || []).slice(0, 4),
         overflow: card.scrollWidth > card.clientWidth + 1,
       };
-    }), CARDS);
+    }), [CARDS, RAW_TEX.source]);
     const pageOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     const by = { 1: [], 2: [], '?': [] };
     for (const c of cards) by[papers.get(c.link)?.summary_version ?? '?'].push(c);
@@ -64,6 +72,57 @@ for (const width of WIDTHS) {
     }
     console.log(`   overflowing cards ${cards.filter((c) => c.overflow).length}, page overflow ${pageOverflow}px, console errors ${errors.length}`);
     if (by[2].some((c) => c.errors || c.rawTex.length) || cards.some((c) => c.overflow) || pageOverflow > 0 || errors.length) failed = true;
+
+    // Digest cards on the first page: open everything, count again.
+    const images = [];
+    page.on('request', (r) => { if (r.resourceType() === 'image' && !r.url().startsWith(BASE)) images.push(r.url()); });
+    const digestCards = page.locator('.card').filter({ has: page.locator('.digest') });
+    const first = await page.locator('.card').evaluateAll((els, n) => els.slice(0, n).filter((c) => c.querySelector('.digest')).length, PAGE);
+    for (let i = 0; i < first; i++) {
+      const card = digestCards.nth(i);
+      const top = card.locator('.digest > details > summary');
+      for (let j = 0; j < await top.count(); j++) await top.nth(j).click();
+      await card.locator('.digest-loading').first().waitFor({ state: 'detached', timeout: 30000 }).catch(() => {});
+      const figs = card.locator('details.figure > summary');
+      for (let j = 0; j < await figs.count(); j++) await figs.nth(j).click();
+    }
+    if (first) {
+      await page.waitForLoadState('networkidle').catch(() => {});
+      await page.waitForTimeout(1500);
+      const open = await digestCards.evaluateAll((els, [n, re]) => els.slice(0, n).map((card) => {
+        const clone = card.cloneNode(true);
+        clone.querySelectorAll('.katex, .sr-only, code').forEach((k) => k.remove());
+        return {
+          link: card.querySelector('.card-title a')?.getAttribute('href') ?? null,
+          toggles: card.querySelectorAll('.digest details').length,
+          closed: card.querySelectorAll('.digest details:not([open])').length,
+          figures: card.querySelectorAll('details.figure').length,
+          images: card.querySelectorAll('img.figure-image').length,
+          // A panel that fails to load is replaced by "Image unavailable" + link.
+          broken: [...card.querySelectorAll('.figure-missing')].filter((p) => p.textContent.includes('unavailable')).length,
+          links: card.querySelectorAll('.figure-missing a').length,
+          equations: card.querySelectorAll('.katex').length,
+          errors: card.querySelectorAll('.katex-error, .katex [style*="color:#cc0000"], .katex [style*="color: rgb(204, 0, 0)"]').length,
+          rawTex: (clone.textContent.match(new RegExp(re, 'g')) || []).slice(0, 4),
+          overflow: card.scrollWidth > card.clientWidth + 1,
+          failedLoad: Boolean(card.querySelector('.digest-error')),
+        };
+      }), [first, RAW_TEX.source]);
+      const sum = (k) => open.reduce((a, c) => a + (typeof c[k] === 'number' ? c[k] : c[k].length ? 1 : 0), 0);
+      const foreign = images.filter((u) => !ARXIV_IMAGE.test(u));
+      const overflowAll = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      console.log(`   digest, all open: ${open.length} cards, ${sum('toggles')} toggles (${sum('closed')} still closed), ${sum('figures')} figures, ` +
+        `${sum('images')} images shown, ${sum('broken')} figures with a panel that failed to load, ${sum('links')} arXiv links, ${sum('equations')} equations, ` +
+        `${open.filter((c) => c.errors).length} with KaTeX errors (${sum('errors')} nodes), ${open.filter((c) => c.rawTex.length).length} with raw TeX, ` +
+        `${open.filter((c) => c.overflow).length} overflowing, page overflow ${overflowAll}px, ${images.length} image requests (${foreign.length} not arXiv), ` +
+        `${open.filter((c) => c.failedLoad).length} digest load errors, console errors ${errors.length}`);
+      for (const c of open.filter((x) => x.errors || x.rawTex.length || x.broken || x.overflow || x.failedLoad)) {
+        console.log(`   ${papers.get(c.link)?.arxiv_id ?? c.link}: errors ${c.errors}, raw TeX ${JSON.stringify(c.rawTex)}, broken ${c.broken}, overflow ${c.overflow}, load error ${c.failedLoad}`);
+      }
+      if (open.some((c) => c.errors || c.rawTex.length || c.overflow || c.closed || c.failedLoad) || foreign.length || overflowAll > 0 || errors.length) failed = true;
+    } else {
+      console.log('   digest: no digest cards on the first page');
+    }
     await page.close();
   }
   await context.close();
