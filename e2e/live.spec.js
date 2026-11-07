@@ -51,8 +51,8 @@ for (const theme of ['light', 'dark']) {
       await page.mouse.wheel(0, 30000);
       await expect(page.locator('.card')).toHaveCount(20, { timeout: 30_000 });
 
-      expect(await page.locator('.card .katex').count()).toBeGreaterThan(0);
-      console.log(`[${name} ${theme}] KaTeX error nodes in 20 cards: ${await katexErrors(page)}`);
+      // Cards with a digest start closed, so the top rows may show no math at all.
+      console.log(`[${name} ${theme}] KaTeX nodes / error nodes in 20 cards: ${await page.locator('.card .katex').count()} / ${await katexErrors(page)}`);
       expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 
       await expect(page.locator('.data-date')).toContainText(/Rankings as of \w+ \d+, \d{4}/);
@@ -63,50 +63,32 @@ for (const theme of ['light', 'dark']) {
   }
 }
 
-// Digest against the real data: the first row without a digest is marked as
-// having one (list response only); its digest file request then 404s and
-// the card falls back to the paragraph.
-test('live digest: rows carry the digest fields; a 404 digest falls back to the paragraph', async ({ browser }) => {
+// Digest against the real data: rows carry the digest fields, and opening a
+// real digest card's Abstract fetches its file from /data/digests (200) and
+// renders it. (The 404 fallback is covered against the mock in digest.spec.js.)
+test('live digest: rows carry the digest fields; a real digest opens from its static file', async ({ browser }) => {
   for (const viewport of [VIEWPORTS.mobile, VIEWPORTS.desktop]) {
     const { context, page, errors } = await openPage(browser, { viewport });
     const rows = [];
-    let marked = null;
-    await page.route(TOP, async (route) => {
-      const res = await route.fetch();
-      const body = await res.json();
-      rows.push(...body.repos.map((r) => ({ ...r })));
-      // Marked by id in every response: dev mode's double mount aborts the first request.
-      if (!marked && body.repos[0] && !body.repos[0].has_digest) marked = { ...body.repos[0] };
-      for (const r of body.repos.filter((x) => marked && x.arxiv_id === marked.arxiv_id)) {
-        r.has_digest = true;
-        r.digest_headlines = [{ id: 'S1', heading: 'Introduction', headline: 'A headline for the 404 check.', figure_count: 1 }];
-      }
-      await route.fulfill({ response: res, json: body });
-    });
+    page.on('response', async (r) => { if (TOP.test(r.url())) rows.push(...(await r.json()).repos); });
     const digestStatus = [];
     page.on('response', (r) => { if (/\/data\/digests\/[^/]+\.json$/.test(r.url())) digestStatus.push(r.status()); });
     await page.goto('/');
     await expect(page.locator('.card')).toHaveCount(10);
-    expect(rows.length).toBeGreaterThanOrEqual(10);
+    await expect.poll(() => rows.length).toBeGreaterThanOrEqual(10);
     expect(rows.every((r) => typeof r.has_digest === 'boolean' && 'digest_headlines' in r)).toBe(true);
     const real = new Set(rows.filter((r) => r.has_digest).map((r) => r.arxiv_id)).size;
+    expect(await page.locator('.card .digest').count()).toBe(real);
+    expect(real, 'no digest among the first 10 rows').toBeGreaterThan(0);
 
-    const card = page.locator('.card').first();
-    expect(marked, 'first row already has a real digest; nothing to mark').not.toBeNull();
-    await expect(card.locator('.digest > details')).toHaveCount(2); // Abstract + the marked section
+    const card = page.locator('.card').filter({ has: page.locator('.digest') }).first();
     expect(digestStatus).toEqual([]); // nothing fetched before a toggle opens
-    await card.locator('.digest > details > summary').nth(1).click();
-    await expect.poll(() => digestStatus.length).toBe(1);
-    if (digestStatus[0] === 404) {
-      await expect(card.locator(':scope > .summary')).toBeVisible();
-      await expect(card.locator('.digest')).toHaveCount(0);
-    }
-    // Cards without a real digest keep the paragraph.
-    expect(await page.locator('.card .digest').count()).toBe(real + (digestStatus[0] === 404 ? 0 : 1));
-    console.log(`[live digest ${viewport.width}] ${marked.arxiv_id}: digest HTTP ${digestStatus[0]}, ${real} real digest rows on page 1, ` +
-      `fallback paragraph shown ${await card.locator(':scope > .summary').count() === 1}`);
-    // The browser logs the expected 404; nothing else may reach the console.
-    expect(errors.filter((e) => !/status of 404/.test(e))).toEqual([]);
+    await card.locator('.digest > details > summary').first().click();
+    await expect.poll(() => digestStatus).toEqual([200]);
+    await expect(card.locator('.digest > details').first().locator('.digest-body')).not.toBeEmpty();
+    await expect(card.locator('.digest-error')).toHaveCount(0);
+    console.log(`[live digest ${viewport.width}] ${real} digest rows on page 1; abstract opened from its static file`);
+    expect(errors).toEqual([]);
     await context.close();
   }
 });
