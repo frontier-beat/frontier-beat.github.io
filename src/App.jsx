@@ -8,7 +8,7 @@ import skyLight from './assets/bg-light.jpg';
 import skyDark from './assets/bg-dark.jpg';
 import PaperList from './components/PaperList';
 import RankingControls from './components/RankingControls';
-import { DEFAULT_SORT, DEFAULT_WINDOW, SORTS, WINDOWS } from './api';
+import { DEFAULT_SORT, DEFAULT_WINDOW, SORTS, WINDOWS, fetchMeta } from './api';
 
 const FixturePage = lazy(() => import('./components/FixturePage'));
 
@@ -92,6 +92,17 @@ function Background({ dark }) {
   return <div className="background" ref={ref} aria-hidden="true" style={src ? { backgroundImage: `url(${src})` } : undefined} />;
 }
 
+// The rankings are a snapshot (scripts/refresh-static.sh in the backend), so say when it was taken.
+function DataDate() {
+  const [date, setDate] = useState(null);
+  useEffect(() => {
+    fetchMeta().then((m) => setDate(m.generated_at ? new Date(m.generated_at) : null), () => {});
+  }, []);
+  if (!date || Number.isNaN(date.getTime())) return null;
+  const day = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  return <p className="data-date">Rankings as of {day}</p>;
+}
+
 const Footer = () => (
   <footer className="footer">
     <FaCoffee size={10} /> Freshly brewed with <FaHeart size={8} /> at the{' '}
@@ -128,6 +139,7 @@ export default function App() {
           <a href="/" aria-label="Frontier Beat home"><img className="logo" src={dark ? darkLogo : lightLogo} alt="Frontier Beat" /></a>
         </header>
         <h1 className="page-title">Open-source machine learning papers</h1>
+        <DataDate />
         {fixtures ? (
           <Suspense fallback={<p className="list-status">Loading fixtures…</p>}><FixturePage /></Suspense>
         ) : (

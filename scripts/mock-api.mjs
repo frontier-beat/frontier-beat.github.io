@@ -1,9 +1,12 @@
-// Local stand-in for the Frontier Beat API (contracts.md "API contract").
-// Serves the 2024 fixtures with deterministic synthetic star data.
+// Local stand-in for the Frontier Beat data (contracts.md "API contract").
+// Serves the 2024 fixtures with deterministic synthetic star data, under the
+// static layout the site reads since 2026-11-06 (src/api.js):
+//   /data/top/<sort>/<window>/<page>.json, /data/digests/<id>.json, /data/meta.json
+// and, for older scripts, the retired API paths /top_papers and /papers/<id>/digest.
 //
 //   node scripts/mock-api.mjs            # http://localhost:8787
 //   PORT=9000 MOCK_DELAY=800 node scripts/mock-api.mjs
-//   MOCK_FAIL=1   -> every /top_papers call returns 500 (error state)
+//   MOCK_FAIL=1   -> every ranking page returns 500 (error state)
 //   MOCK_EDGE=1   -> also serve src/fixtures/edge-cases.json rows as v2 papers
 //
 // Papers with a digest (src/fixtures/*digest*.json) lead every ranking and
@@ -17,6 +20,7 @@ const DELAY = Number(process.env.MOCK_DELAY || 0);
 const ORIGINS = ['https://frontier-beat.github.io', 'http://localhost:5173', 'http://localhost:4173', 'http://localhost:3000'];
 const SORTS = ['trending', 'stars', 'gained', 'new'];
 const WINDOW_DAYS = { day: 1, week: 7, month: 30, all: Infinity };
+const MAX_ROWS = 100; // rows per ranking in the static export (export_static.py --max-rows)
 
 const load = (p) => JSON.parse(readFileSync(new URL(p, import.meta.url)));
 
@@ -153,5 +157,22 @@ createServer((req, res) => {
     return send(digest ? [200, digest] : [404, { error: 'no digest' }]);
   }
   if (url.pathname === '/top_papers') return send(process.env.MOCK_FAIL ? [500, { error: 'mock failure' }] : topPapers(url.searchParams));
+  if (url.pathname === '/data/meta.json') return send([200, { generated_at: new Date(NOW).toISOString().replace(/\.\d+Z$/, 'Z'), rows_per_ranking: MAX_ROWS, papers: papers.length }]);
+  const staticTop = url.pathname.match(/^\/data\/top\/([^/]+)\/([^/]+)\/(\d+)\.json$/);
+  if (staticTop) {
+    if (process.env.MOCK_FAIL) return send([500, { error: 'mock failure' }]);
+    const [, sort, window, page] = staticTop;
+    const [status, body] = topPapers(new URLSearchParams({ sort, window, page, per_page: '10' }));
+    if (status !== 200) return send([404, { error: 'not found' }]);
+    const shown = Math.min(body.total, MAX_ROWS);
+    if (+page > 1 && (page - 1) * 10 >= shown) return send([404, { error: 'not found' }]);
+    body.repos = body.repos.slice(0, Math.max(0, shown - (page - 1) * 10));
+    return send([200, { ...body, total: shown, total_ranked: body.total }]);
+  }
+  const staticDigest = url.pathname.match(/^\/data\/digests\/([^/]+)\.json$/);
+  if (staticDigest) {
+    const digest = DIGESTS.get(decodeURIComponent(staticDigest[1]).replace(/_/g, '/'));
+    return send(digest ? [200, digest] : [404, { error: 'no digest' }]);
+  }
   return send([404, { error: 'not found' }]);
 }).listen(PORT, () => console.log(`mock API on http://localhost:${PORT} (${papers.length} papers)`));

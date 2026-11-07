@@ -1,16 +1,21 @@
-// Live API (or the deployed site): data loads, ranking switches work, LaTeX
-// renders, at 375 px and 1280 px in both themes. Screenshots go to
+// Real data (the static snapshot in public/data, or the deployed site): data
+// loads, ranking switches work, LaTeX renders, nothing calls the retired API,
+// at 375 px and 1280 px in both themes. Screenshots go to
 // docs/screenshots/<target>-<width>-<theme>.png.
 import { test, expect } from '@playwright/test';
 import { VIEWPORTS, openPage } from './helpers';
 
 const target = process.env.SHOT_PREFIX || (process.env.E2E_BASE_URL ? 'deployed' : 'live');
+const TOP = /\/data\/top\/([a-z]+)\/([a-z]+)\/(\d+)\.json$/;
+const sortOf = (url) => (new URL(url).pathname.match(TOP) || [])[1];
 const katexErrors = (page) => page.locator('.card .katex-error, .card .katex [style*="color:#cc0000"]').count();
 
 for (const theme of ['light', 'dark']) {
   for (const [name, viewport] of Object.entries(VIEWPORTS)) {
     test(`${target} ${name} ${theme}`, async ({ browser }) => {
       const { context, page, errors } = await openPage(browser, { theme, viewport });
+      const apiCalls = [];
+      page.on('request', (r) => { if (/run\.app/.test(r.url())) apiCalls.push(r.url()); });
 
       // Default view: trending + 30d. With 2024 seed data this is empty and
       // offers all time; once the jobs run it has cards. Accept either.
@@ -30,7 +35,7 @@ for (const theme of ['light', 'dark']) {
       // can legitimately coincide: the top trending paper may also have the
       // most stars.) An empty windowed result falls back to all time.
       for (const [label, value] of [['Most stars', 'stars'], ['Stars gained', 'gained'], ['Newest', 'new'], ['Trending', 'trending']]) {
-        const response = page.waitForResponse((r) => r.url().includes('/top_papers') && new URL(r.url()).searchParams.get('sort') === value);
+        const response = page.waitForResponse((r) => sortOf(r.url()) === value);
         await page.getByText(label, { exact: true }).click();
         const res = await response;
         expect(res.status()).toBe(200);
@@ -50,21 +55,23 @@ for (const theme of ['light', 'dark']) {
       console.log(`[${name} ${theme}] KaTeX error nodes in 20 cards: ${await katexErrors(page)}`);
       expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 
+      await expect(page.locator('.data-date')).toContainText(/Rankings as of \w+ \d+, \d{4}/);
+      expect(apiCalls).toEqual([]);
       expect(errors).toEqual([]);
       await context.close();
     });
   }
 }
 
-// Digest against the live API. Until digests are built every row has
-// has_digest false, so the first row is marked as having one (list
-// response only); its GET /papers/<id>/digest goes to the real API.
+// Digest against the real data: the first row without a digest is marked as
+// having one (list response only); its digest file request then 404s and
+// the card falls back to the paragraph.
 test('live digest: rows carry the digest fields; a 404 digest falls back to the paragraph', async ({ browser }) => {
   for (const viewport of [VIEWPORTS.mobile, VIEWPORTS.desktop]) {
     const { context, page, errors } = await openPage(browser, { viewport });
     const rows = [];
     let marked = null;
-    await page.route(/\/top_papers\?/, async (route) => {
+    await page.route(TOP, async (route) => {
       const res = await route.fetch();
       const body = await res.json();
       rows.push(...body.repos.map((r) => ({ ...r })));
@@ -77,7 +84,7 @@ test('live digest: rows carry the digest fields; a 404 digest falls back to the 
       await route.fulfill({ response: res, json: body });
     });
     const digestStatus = [];
-    page.on('response', (r) => { if (/\/papers\/[^/]+\/digest$/.test(r.url())) digestStatus.push(r.status()); });
+    page.on('response', (r) => { if (/\/data\/digests\/[^/]+\.json$/.test(r.url())) digestStatus.push(r.status()); });
     await page.goto('/');
     await expect(page.locator('.card')).toHaveCount(10);
     expect(rows.length).toBeGreaterThanOrEqual(10);

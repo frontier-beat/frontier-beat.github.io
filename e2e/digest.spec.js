@@ -17,7 +17,7 @@ async function openDigestPage(browser, opts) {
     images.push(route.request().url());
     return route.fulfill({ contentType: 'image/svg+xml', body: PLACEHOLDER });
   });
-  ctx.page.on('request', (r) => { if (/\/papers\/[^/]+\/digest$/.test(r.url())) digests.push(r.url()); });
+  ctx.page.on('request', (r) => { if (/\/data\/digests\/[^/]+\.json$/.test(r.url())) digests.push(r.url()); });
   return { ...ctx, images, digests };
 }
 
@@ -185,7 +185,7 @@ test('figures: inline SVG gets caption and arXiv link, foreign image never loads
 
 test('digest 404 falls back to the v2 paragraph; errors offer retry', async ({ browser }) => {
   const { context, page, errors } = await openPage(browser);
-  await page.route('**/papers/*/digest', (r) => r.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"no digest"}' }));
+  await page.route('**/data/digests/*.json', (r) => r.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"no digest"}' }));
   await page.goto('/');
   const card = page.locator('.card').filter({ hasText: 'Edge cases for the paper digest renderer' });
   await card.locator('.digest > details > summary').nth(1).click();
@@ -193,12 +193,12 @@ test('digest 404 falls back to the v2 paragraph; errors offer retry', async ({ b
   await expect(card.locator('.digest')).toHaveCount(0);
 
   const other = await openPage(browser);
-  await other.page.route('**/papers/*/digest', (r) => r.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"boom"}' }));
+  await other.page.route('**/data/digests/*.json', (r) => r.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"boom"}' }));
   await other.page.goto('/');
   const card2 = other.page.locator('.card').filter({ hasText: 'Edge cases for the paper digest renderer' });
   await card2.locator('.digest > details > summary').first().click();
   await expect(card2.locator('.digest-error')).toContainText('HTTP 500: boom');
-  await other.page.unroute('**/papers/*/digest');
+  await other.page.unroute('**/data/digests/*.json');
   await card2.getByRole('button', { name: 'Retry' }).click();
   await expect(card2.locator('.digest > details').first().locator('.digest-body')).toContainText('sparse attention');
   // The only console lines are the browser's own logs of the stubbed failures.
@@ -210,7 +210,7 @@ test('digest 404 falls back to the v2 paragraph; errors offer retry', async ({ b
 
 test('an open toggle stays open when the digest arrives, even if its sections differ from the list row', async ({ browser }) => {
   const { context, page, errors } = await openPage(browser);
-  await page.route('**/papers/edge.digest/digest', async (route) => {
+  await page.route('**/data/digests/edge.digest.json', async (route) => {
     const res = await route.fetch();
     const digest = await res.json();
     digest.sections.push({ id: 'X9', heading: 'Late section', headline: 'A section the list row did not have.', body: 'Body of the late section.', figure_ids: [] });
@@ -236,7 +236,7 @@ test('an open toggle stays open when the digest arrives, even if its sections di
 test('a 404 digest is remembered: after a ranking switch the card starts on its paragraph', async ({ browser }) => {
   const { context, page } = await openPage(browser);
   const requests = [];
-  await page.route('**/papers/edge.digest/digest', (r) => { requests.push(r.request().url()); return r.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"no digest"}' }); });
+  await page.route('**/data/digests/edge.digest.json', (r) => { requests.push(r.request().url()); return r.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"no digest"}' }); });
   await page.goto('/');
   const card = () => page.locator('.card').filter({ hasText: 'Edge cases for the paper digest renderer' });
   await card().locator('.digest > details > summary').first().click();

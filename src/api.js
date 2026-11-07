@@ -1,6 +1,11 @@
-// Client for GET /top_papers (contracts.md "API contract").
-// Production default is the Cloud Run service; tests and dev override it.
-export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://api-rcvqmjv3ua-ue.a.run.app').replace(/\/+$/, '');
+// Static data (since 2026-11-06 the site has no API): the backend's
+// scripts/export_static.py writes the old API responses as files under
+// public/data, refreshed by its scripts/refresh-static.sh.
+//   top/<sort>/<window>/<page>.json   was GET /top_papers?sort&window&page&per_page=10
+//   digests/<arxiv id>.json           was GET /papers/<id>/digest
+//   meta.json                         when the snapshot was taken
+// Tests point VITE_DATA_BASE_URL at the mock server.
+export const DATA_BASE_URL = (import.meta.env.VITE_DATA_BASE_URL || `${import.meta.env.BASE_URL}data`).replace(/\/+$/, '');
 
 export const SORTS = [
   { value: 'trending', label: 'Trending' },
@@ -26,6 +31,13 @@ export const windowFiltersPublished = (sort) => sort === 'stars' || sort === 'ne
 
 async function getJson(url, signal) {
   const res = await fetch(url, { signal });
+  // A static host may answer a missing file with its HTML page (a dev
+  // server's SPA fallback): that is a 404 too.
+  if (res.ok && !(res.headers.get('content-type') || '').includes('json')) {
+    const err = new Error('HTTP 404');
+    err.status = 404;
+    throw err;
+  }
   if (!res.ok) {
     let detail = '';
     try { detail = (await res.json()).error || ''; } catch { /* not JSON */ }
@@ -36,12 +48,17 @@ async function getJson(url, signal) {
   return res.json();
 }
 
+// Each page file holds PER_PAGE rows; `total` is the number of rows exported.
 export function fetchPapers({ sort, window, page, signal }) {
-  const params = new URLSearchParams({ sort, window, page: String(page), per_page: String(PER_PAGE) });
-  return getJson(`${API_BASE_URL}/top_papers?${params}`, signal);
+  return getJson(`${DATA_BASE_URL}/top/${sort}/${window}/${page}.json`, signal);
 }
 
-// GET /papers/<id>/digest (digest-contract.md), once per paper per page
+// Old-style ids (hep-th/9901001) carry a slash; export_static.py replaces it the same way.
+export const digestFile = (arxivId) => `${encodeURIComponent(arxivId.replace(/\//g, '_'))}.json`;
+
+export const fetchMeta = () => getJson(`${DATA_BASE_URL}/meta.json`);
+
+// A paper's digest (digest-contract.md), once per paper per page
 // load: a card remounted by a ranking change reuses the response. A 404 is
 // remembered (digestMissing) so the card stays on its paragraph; other
 // failures are forgotten so Retry asks again.
@@ -50,7 +67,7 @@ const missing = new Set();
 export const digestMissing = (arxivId) => missing.has(arxivId);
 export function fetchDigest(arxivId) {
   if (!digests.has(arxivId)) {
-    const request = getJson(`${API_BASE_URL}/papers/${encodeURIComponent(arxivId)}/digest`);
+    const request = getJson(`${DATA_BASE_URL}/digests/${digestFile(arxivId)}`);
     request.catch((err) => {
       if (err.status === 404) missing.add(arxivId);
       else digests.delete(arxivId);

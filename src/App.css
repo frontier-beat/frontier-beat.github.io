@@ -96,6 +96,18 @@ a:hover {
   font-weight: 400;
 }
 
+/* The rankings are a snapshot; one muted line says when it was taken. */
+.page-title:has(+ .data-date) {
+  margin-bottom: 4px;
+}
+
+.data-date {
+  margin: 0 0 var(--gap);
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+
 /* Meta text: the departure-board voice. */
 .strip,
 .segmented legend,

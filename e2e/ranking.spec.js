@@ -2,14 +2,19 @@
 import { test, expect } from '@playwright/test';
 import { openPage } from './helpers';
 
-const apiRequest = (page) => page.waitForRequest((r) => r.url().includes('/top_papers'));
-const params = (req) => Object.fromEntries(new URL(req.url()).searchParams);
+// Static data (no API since 2026-11-06): /data/top/<sort>/<window>/<page>.json.
+const TOP = /\/data\/top\/([a-z]+)\/([a-z]+)\/(\d+)\.json$/;
+const apiRequest = (page) => page.waitForRequest((r) => TOP.test(new URL(r.url()).pathname));
+const params = (req) => {
+  const [, sort, window, page] = new URL(typeof req === 'string' ? req : req.url()).pathname.match(TOP);
+  return { sort, window, page };
+};
 
 test('default ranking is trending + 30d and loads page 1', async ({ browser }) => {
   const { context, page, errors } = await openPage(browser);
   const req = apiRequest(page);
   await page.goto('/');
-  expect(params(await req)).toMatchObject({ sort: 'trending', window: 'month', page: '1', per_page: '10' });
+  expect(params(await req)).toMatchObject({ sort: 'trending', window: 'month', page: '1' });
   await expect(page.getByRole('radio', { name: 'Trending' })).toBeChecked();
   await expect(page.getByRole('radio', { name: '30d' })).toBeChecked();
   await expect(page.locator('.card')).toHaveCount(10);
@@ -71,10 +76,10 @@ test('deep link restores controls', async ({ browser }) => {
 
 test('error state offers retry', async ({ browser }) => {
   const { context, page } = await openPage(browser);
-  await page.route('**/top_papers**', (r) => r.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"boom"}' }));
+  await page.route('**/data/top/**', (r) => r.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"boom"}' }));
   await page.goto('/');
   await expect(page.getByRole('status')).toContainText('Could not load papers (HTTP 500: boom)');
-  await page.unroute('**/top_papers**');
+  await page.unroute('**/data/top/**');
   await page.getByRole('button', { name: 'Retry' }).click();
   await expect(page.locator('.card')).toHaveCount(10);
   await context.close();
@@ -82,10 +87,10 @@ test('error state offers retry', async ({ browser }) => {
 
 test('empty windowed result offers all time', async ({ browser }) => {
   const { context, page } = await openPage(browser);
-  await page.route('**/top_papers**', (r) => {
-    const q = new URL(r.request().url()).searchParams;
-    if (q.get('window') === 'all') return r.fallback();
-    return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ page: 1, per_page: 10, sort: q.get('sort'), window: q.get('window'), total: 0, repos: [] }) });
+  await page.route('**/data/top/**', (r) => {
+    const q = params(r.request().url());
+    if (q.window === 'all') return r.fallback();
+    return r.fulfill({ contentType: 'application/json', body: JSON.stringify({ page: 1, per_page: 10, sort: q.sort, window: q.window, total: 0, repos: [] }) });
   });
   await page.goto('/');
   await expect(page.getByRole('status')).toContainText('No papers in this window.');
